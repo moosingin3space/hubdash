@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+    "hubdash",
+]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+all = { priority = -1, level = "deny" }
