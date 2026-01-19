@@ -38,6 +38,13 @@ func (m *Hubdash) Lint(
 		return checkOut, err
 	}
 	fmtOut, err := rust.CargoFmtCheck(ctx)
-	combinedOut := checkOut + fmtOut
+	if err != nil {
+		return fmtOut, err
+	}
+	clippyOut, err := rust.CargoClippy(ctx)
+	if err != nil {
+		return clippyOut, err
+	}
+	combinedOut := checkOut + fmtOut + clippyOut
 	return combinedOut, err
 }

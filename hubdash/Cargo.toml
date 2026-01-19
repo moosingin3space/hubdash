@@ -12,11 +12,14 @@ name = "hubdash"
 [dependencies]
 axum = { version = "0.8.8", default-features = false, features = ["http1", "http2"] }
 tokio = { version = "1.49.0", optional = true, features = ["full"] }
-clap = { version = "4.5.20", features = ["derive", "env"] }
+clap = { version = "4.5.20", optional = true, features = ["derive", "env"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 maud = { version = "0.27.0", features = ["axum"] }
+jiff = "0.2.18"
+bitflags = "2.10.0"
+url = "2.5.8"
 
 [features]
 default = ["tokio"]
-tokio = ["dep:tokio", "axum/tokio"]
+tokio = ["dep:tokio", "axum/tokio", "dep:clap"]
