@@ -10,3 +10,5 @@ Renovate or Dependabot.
   synchronization problems.
 - This app is written in Rust. Follow best practices for Rust development.
   - We use Axum for HTTP support and Maud for HTML templates.
+  - Skills are provided to explain how to check code quality.
+- This app uses Dagger as a workflow/pipelines tool.
