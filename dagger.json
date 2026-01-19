@@ -8,7 +8,7 @@
     {
       "name": "rust",
       "source": "github.com/moosingin3space/daggerverse/modules/rust@main",
-      "pin": "7fe8878f8fa215a83bd9e1da95256a818c52b440"
+      "pin": "c7e25953cd862cdc77134431ebd3a9fb0b3a19cf"
     },
     {
       "name": "wolfi",
