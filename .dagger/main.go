@@ -29,7 +29,8 @@ func (m *Hubdash) Lint(
 	source *dagger.Directory,
 ) (string, error) {
 	rust := dag.Rust().DevContainer(dagger.RustDevContainerOpts{
-		Source: source,
+		ToolchainFile: source.File("rust-toolchain.toml"),
+		Source:        source,
 	})
 
 	checkOut, err := rust.CargoCheck(ctx)
