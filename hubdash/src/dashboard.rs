@@ -82,7 +82,7 @@ fn repo_expand_url(owner: &str, repo: &str) -> Url {
         .push(owner)
         .push(repo)
         .push("expand");
-    Url::parse(url.path()).expect("valid path")
+    url
 }
 
 fn repo_deps_url(owner: &str, repo: &str) -> Url {
@@ -94,7 +94,7 @@ fn repo_deps_url(owner: &str, repo: &str) -> Url {
         .push(owner)
         .push(repo)
         .push("deps");
-    Url::parse(url.path()).expect("valid path")
+    url
 }
 
 /// Generates the Alpine.js `x-data` attribute value for an expandable component.
