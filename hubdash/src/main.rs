@@ -30,7 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(EnvFilter::new(&args.log_level))
         .init();
 
-    let router = hubdash::create_router();
+    let platform = hubdash::TokioPlatform;
+    let router = hubdash::create_router(platform);
     let listener = tokio::net::TcpListener::bind(args.bind_address).await?;
     Ok(axum::serve(listener, router.into_make_service()).await?)
 }
