@@ -28,6 +28,7 @@ use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
     rt::TokioExecutor,
 };
+use thiserror::Error;
 
 /// A Tokio-based platform for running HubDash.
 pub struct TokioPlatform;
@@ -45,30 +46,12 @@ pub struct HyperUtilHttpClient {
 }
 
 /// Error type for HTTP client operations.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum HttpClientError {
-    /// Error from the legacy client.
-    Client(hyper_util::client::legacy::Error),
-    /// Error collecting response body.
-    Body(hyper::Error),
-}
-
-impl std::fmt::Display for HttpClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Client(e) => write!(f, "{e}"),
-            Self::Body(e) => write!(f, "{e}"),
-        }
-    }
-}
-
-impl std::error::Error for HttpClientError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Client(e) => Some(e),
-            Self::Body(e) => Some(e),
-        }
-    }
+    #[error(transparent)]
+    Client(#[from] hyper_util::client::legacy::Error),
+    #[error(transparent)]
+    Body(#[from] hyper::Error),
 }
 
 impl Platform for TokioPlatform {
