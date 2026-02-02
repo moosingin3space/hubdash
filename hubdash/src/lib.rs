@@ -4,7 +4,9 @@
 //! This is split into a library crate in order to enable deployment
 //! in either a Cloudflare Worker or a standalone server.
 
-use axum::{Router, routing::get};
+use std::error::Error;
+
+use axum::{Router, body::HttpBody, routing::get};
 
 mod assets;
 mod dashboard;
@@ -12,9 +14,15 @@ mod github;
 mod landing;
 mod layout;
 mod mocks;
+mod platform;
+
+#[cfg(feature = "tokio")]
+pub use platform::tokio::TokioPlatform;
 
 /// Creates an Axum router for the Hubdash application.
-pub fn create_router() -> Router {
+pub fn create_router(plat: impl Platform) -> Router {
+    // TODO use the platform
+    let _plat = plat;
     Router::new()
         .route("/", get(landing::landing_page))
         .route("/dashboard", get(dashboard::dashboard_page))
@@ -27,4 +35,28 @@ pub fn create_router() -> Router {
             get(dashboard::repo_deps),
         )
         .nest("/assets", assets::router())
+}
+
+/// Represents an HTTP Client interface.
+pub trait HttpClient {
+    /// The type of HTTP body that this client is capable of fetching.
+    type Body: HttpBody;
+
+    /// The type of error this platform can return.
+    type Error: Error;
+
+    /// Fetches
+    fn fetch(
+        &self,
+        req: http::Request<Self::Body>,
+    ) -> Result<http::Response<Self::Body>, Self::Error>;
+}
+
+/// Represents a Platform that HubDash can run on.
+pub trait Platform {
+    /// The type of HTTP client this platform supports.
+    type HttpClient: HttpClient;
+
+    /// Creates a new HTTP client for this platform.
+    fn create_http_client(&self) -> Self::HttpClient;
 }
