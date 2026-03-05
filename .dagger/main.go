@@ -48,3 +48,20 @@ func (m *Hubdash) Lint(
 	combinedOut := checkOut + fmtOut + clippyOut
 	return combinedOut, err
 }
+
+// Runs cargo test.
+// Source directory defaults to the root of the repository.
+func (m *Hubdash) Test(
+	ctx context.Context,
+	//+defaultPath="/"
+	source *dagger.Directory,
+) (string, error) {
+	rust := dag.Rust().DevContainer(dagger.RustDevContainerOpts{
+		ToolchainFile: source.File("rust-toolchain.toml"),
+		Source:        source,
+	})
+
+	container := rust.Container()
+	testOut, err := container.WithExec([]string{"cargo", "test"}).Stdout(ctx)
+	return testOut, err
+}
