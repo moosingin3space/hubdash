@@ -28,6 +28,7 @@ jsonwebtoken = "9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+dotenv = { version = "0.15.0", optional = true }
 
 [dev-dependencies]
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
@@ -35,4 +36,4 @@ rand = "0.8"
 
 [features]
 default = ["tokio"]
-tokio = ["dep:tokio", "axum/tokio", "dep:clap", "dep:hyper", "dep:hyper-util", "dep:http-body-util", "dep:bytes"]
+tokio = ["dep:tokio", "axum/tokio", "dep:clap", "dep:hyper", "dep:hyper-util", "dep:http-body-util", "dep:bytes", "dep:dotenv"]
