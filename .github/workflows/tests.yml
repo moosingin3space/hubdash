@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: ["**"]
+    repository_dispatch:
+        types: [dagger-update-complete]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: Run tests
+              uses: dagger/dagger-for-github@496f1b3d8b0d823834c13e67cf8a8e08ca3b9602 # v8.4.0
+              with:
+                  version: "0.19.10"
+                  cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+                  call: test
