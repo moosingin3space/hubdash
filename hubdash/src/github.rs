@@ -10,10 +10,18 @@
 //! 2. **Installation Authentication**: Exchange the JWT for an installation
 //!    access token to perform actions on behalf of an installation.
 
+#[allow(dead_code)]
 mod auth;
+#[allow(dead_code)]
 mod client;
+pub(crate) mod oauth;
+#[allow(dead_code)]
 mod types;
 
+#[allow(unused_imports)]
 pub use auth::{AppCredentials, AppCredentialsError};
+#[allow(unused_imports)]
 pub use client::{GitHubClient, GitHubClientError};
+pub use oauth::GitHubOAuthConfig;
+#[allow(unused_imports)]
 pub use types::{Installation, InstallationAccessToken, InstallationAccount};

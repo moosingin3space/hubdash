@@ -1,0 +1,6 @@
+{
+  "dagger": {
+    "command": "dagger",
+    "args": ["mcp", "--stdio"]
+  }
+}

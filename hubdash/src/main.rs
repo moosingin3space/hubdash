@@ -14,6 +14,14 @@ struct Args {
     /// Enable verbose logging
     #[arg(short, long, env = "LOG_LEVEL", default_value = "info")]
     log_level: String,
+
+    /// GitHub App client ID
+    #[arg(long, env = "GITHUB_CLIENT_ID")]
+    github_client_id: String,
+
+    /// GitHub App client secret
+    #[arg(long, env = "GITHUB_CLIENT_SECRET")]
+    github_client_secret: String,
 }
 
 #[cfg(not(feature = "tokio"))]
@@ -33,7 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let platform = hubdash::TokioPlatform;
-    let router = hubdash::create_router(platform);
+    let oauth = hubdash::GitHubOAuthConfig {
+        client_id: args.github_client_id,
+        client_secret: args.github_client_secret,
+    };
+    let router = hubdash::create_router(platform, oauth);
     let listener = tokio::net::TcpListener::bind(args.bind_address).await?;
     Ok(axum::serve(listener, router.into_make_service()).await?)
 }

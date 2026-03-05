@@ -21,8 +21,10 @@
 //! limits or custom expiration logic), we can migrate to the composable pools
 //! API while keeping the same `HttpClient` trait interface.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
+use crate::session::{Session, SessionId, SessionStore, SessionStoreError};
 use crate::{HttpClient, Platform};
 use http_body::Body;
 use hyper_rustls::HttpsConnectorBuilder;
@@ -60,8 +62,52 @@ pub enum HttpClientError {
     Body(String),
 }
 
+/// An in-memory session store backed by a `HashMap`.
+#[derive(Clone)]
+pub struct InMemorySessionStore {
+    sessions: Arc<Mutex<HashMap<SessionId, Session>>>,
+}
+
+impl InMemorySessionStore {
+    /// Creates a new empty in-memory session store.
+    pub fn new() -> Self {
+        Self {
+            sessions: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+impl SessionStore for InMemorySessionStore {
+    fn put(&self, session: Session) -> Result<(), SessionStoreError> {
+        let mut store = self
+            .sessions
+            .lock()
+            .map_err(|e| SessionStoreError::Internal(e.to_string()))?;
+        store.insert(session.id.clone(), session);
+        Ok(())
+    }
+
+    fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError> {
+        let store = self
+            .sessions
+            .lock()
+            .map_err(|e| SessionStoreError::Internal(e.to_string()))?;
+        Ok(store.get(id).cloned())
+    }
+
+    fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError> {
+        let mut store = self
+            .sessions
+            .lock()
+            .map_err(|e| SessionStoreError::Internal(e.to_string()))?;
+        store.remove(id);
+        Ok(())
+    }
+}
+
 impl Platform for TokioPlatform {
     type HttpClient = HyperUtilHttpClient;
+    type SessionStore = InMemorySessionStore;
 
     fn create_http_client(&self) -> Self::HttpClient {
         let https = HttpsConnectorBuilder::new()
@@ -74,6 +120,10 @@ impl Platform for TokioPlatform {
         HyperUtilHttpClient {
             client: Arc::new(client),
         }
+    }
+
+    fn create_session_store(&self) -> Self::SessionStore {
+        InMemorySessionStore::new()
     }
 }
 
