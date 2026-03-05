@@ -25,10 +25,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::{HttpClient, Platform};
-use hyper_util::{
-    client::legacy::{Client, connect::HttpConnector},
-    rt::TokioExecutor,
-};
+use hyper_rustls::HttpsConnectorBuilder;
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use thiserror::Error;
 
 /// A Tokio-based platform for running HubDash.
@@ -38,13 +36,19 @@ pub struct TokioPlatform;
 /// Internal body type used by the hyper client.
 type HyperBody = http_body_util::Full<bytes::Bytes>;
 
+/// Internal connector type that supports HTTPS via rustls.
+type HttpsConnector =
+    hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+
 /// An HTTP client backed by hyper-util's legacy client.
 ///
 /// This wraps the [`hyper_util::client::legacy::Client`] which provides
 /// automatic connection pooling and keep-alive management. See the module
 /// documentation for why we use the legacy client over the composable pools.
+///
+/// Uses hyper-rustls for HTTPS support with native TLS verification.
 pub struct HyperUtilHttpClient {
-    client: Arc<Client<HttpConnector, HyperBody>>,
+    client: Arc<Client<HttpsConnector, HyperBody>>,
 }
 
 /// Error type for HTTP client operations.
@@ -60,8 +64,13 @@ impl Platform for TokioPlatform {
     type HttpClient = HyperUtilHttpClient;
 
     fn create_http_client(&self) -> Self::HttpClient {
-        let connector = HttpConnector::new();
-        let client = Client::builder(TokioExecutor::new()).build(connector);
+        let https = HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .expect("failed to load native roots for TLS verification")
+            .https_or_http()
+            .enable_all_versions()
+            .build();
+        let client = Client::builder(TokioExecutor::new()).build(https);
         HyperUtilHttpClient {
             client: Arc::new(client),
         }
