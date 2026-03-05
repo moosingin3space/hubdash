@@ -21,7 +21,8 @@
 //! limits or custom expiration logic), we can migrate to the composable pools
 //! API while keeping the same `HttpClient` trait interface.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use crate::{HttpClient, Platform};
 use hyper_util::{
@@ -31,10 +32,11 @@ use hyper_util::{
 use thiserror::Error;
 
 /// A Tokio-based platform for running HubDash.
+#[derive(Clone, Copy)]
 pub struct TokioPlatform;
 
-/// Body type for HTTP requests and responses.
-pub type Body = http_body_util::Full<bytes::Bytes>;
+/// Internal body type used by the hyper client.
+type HyperBody = http_body_util::Full<bytes::Bytes>;
 
 /// An HTTP client backed by hyper-util's legacy client.
 ///
@@ -42,7 +44,7 @@ pub type Body = http_body_util::Full<bytes::Bytes>;
 /// automatic connection pooling and keep-alive management. See the module
 /// documentation for why we use the legacy client over the composable pools.
 pub struct HyperUtilHttpClient {
-    client: Arc<Client<HttpConnector, Body>>,
+    client: Arc<Client<HttpConnector, HyperBody>>,
 }
 
 /// Error type for HTTP client operations.
@@ -67,27 +69,27 @@ impl Platform for TokioPlatform {
 }
 
 impl HttpClient for HyperUtilHttpClient {
-    type Body = Body;
-
     type Error = HttpClientError;
 
-    fn fetch(
+    async fn fetch(
         &self,
-        req: http::Request<Self::Body>,
-    ) -> Result<http::Response<Self::Body>, Self::Error> {
+        req: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, Self::Error> {
         let client = self.client.clone();
-        let handle = tokio::runtime::Handle::current();
-        handle.block_on(async move {
-            let resp = client.request(req).await.map_err(HttpClientError::Client)?;
-            let (parts, body) = resp.into_parts();
-            let body_bytes = http_body_util::BodyExt::collect(body)
-                .await
-                .map_err(HttpClientError::Body)?
-                .to_bytes();
-            Ok(http::Response::from_parts(
-                parts,
-                http_body_util::Full::new(body_bytes),
-            ))
-        })
+
+        // Convert the Vec<u8> body to the hyper body type.
+        let (parts, body) = req.into_parts();
+        let hyper_req = http::Request::from_parts(parts, HyperBody::new(bytes::Bytes::from(body)));
+
+        let resp = client
+            .request(hyper_req)
+            .await
+            .map_err(HttpClientError::Client)?;
+        let (parts, body) = resp.into_parts();
+        let body_bytes = http_body_util::BodyExt::collect(body)
+            .await
+            .map_err(HttpClientError::Body)?
+            .to_bytes();
+        Ok(http::Response::from_parts(parts, body_bytes.to_vec()))
     }
 }

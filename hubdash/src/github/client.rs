@@ -44,7 +44,6 @@ pub enum GitHubClientError<E> {
 impl<C> GitHubClient<C>
 where
     C: HttpClient,
-    C::Body: From<Vec<u8>> + AsRef<[u8]>,
 {
     /// Creates a new GitHub client with the given credentials and HTTP client.
     pub fn new(credentials: AppCredentials, http_client: C) -> Self {
@@ -57,24 +56,28 @@ where
     /// Lists all installations of the GitHub App.
     ///
     /// This authenticates as the app itself using a JWT.
-    pub fn list_installations(&self) -> Result<Vec<Installation>, GitHubClientError<C::Error>> {
+    pub async fn list_installations(
+        &self,
+    ) -> Result<Vec<Installation>, GitHubClientError<C::Error>> {
         self.app_request::<_, NoBody>(Method::GET, "/app/installations", None)
+            .await
     }
 
     /// Gets the installation for a specific organization.
     ///
     /// This authenticates as the app itself using a JWT.
-    pub fn get_org_installation(
+    pub async fn get_org_installation(
         &self,
         org: &str,
     ) -> Result<Installation, GitHubClientError<C::Error>> {
         self.app_request::<_, NoBody>(Method::GET, &format!("/orgs/{org}/installation"), None)
+            .await
     }
 
     /// Gets the installation for a specific user.
     ///
     /// This authenticates as the app itself using a JWT.
-    pub fn get_user_installation(
+    pub async fn get_user_installation(
         &self,
         username: &str,
     ) -> Result<Installation, GitHubClientError<C::Error>> {
@@ -83,13 +86,14 @@ where
             &format!("/users/{username}/installation"),
             None,
         )
+        .await
     }
 
     /// Creates an installation access token for the given installation ID.
     ///
     /// The returned token can be used to make API requests on behalf of
     /// the installation. The token expires after 1 hour.
-    pub fn create_installation_access_token(
+    pub async fn create_installation_access_token(
         &self,
         installation_id: u64,
     ) -> Result<InstallationAccessToken, GitHubClientError<C::Error>> {
@@ -98,10 +102,11 @@ where
             &format!("/app/installations/{installation_id}/access_tokens"),
             Some(&serde_json::json!({})),
         )
+        .await
     }
 
     /// Makes an authenticated request to the GitHub API as the app.
-    fn app_request<T, B>(
+    async fn app_request<T, B>(
         &self,
         method: Method,
         path: &str,
@@ -117,7 +122,7 @@ where
             .map_err(GitHubClientError::Authentication)?;
 
         let request = self.build_request(method, path, &jwt, json_body)?;
-        self.execute_request(request)
+        self.execute_request(request).await
     }
 
     /// Builds an HTTP request with standard GitHub API headers.
@@ -127,17 +132,17 @@ where
         path: &str,
         token: &str,
         json_body: Option<&B>,
-    ) -> Result<Request<C::Body>, GitHubClientError<C::Error>>
+    ) -> Result<Request<Vec<u8>>, GitHubClientError<C::Error>>
     where
         B: Serialize,
     {
         let url = format!("{GITHUB_API_BASE}{path}");
-        let (body, has_body): (C::Body, bool) = match json_body {
+        let (body, has_body): (Vec<u8>, bool) = match json_body {
             Some(b) => {
                 let bytes = serde_json::to_vec(b).map_err(GitHubClientError::JsonSerialize)?;
-                (bytes.into(), true)
+                (bytes, true)
             }
-            None => (Vec::new().into(), false),
+            None => (Vec::new(), false),
         };
 
         let mut builder = Request::builder()
@@ -156,9 +161,9 @@ where
     }
 
     /// Executes an HTTP request and parses the JSON response.
-    fn execute_request<T>(
+    async fn execute_request<T>(
         &self,
-        request: Request<C::Body>,
+        request: Request<Vec<u8>>,
     ) -> Result<T, GitHubClientError<C::Error>>
     where
         T: DeserializeOwned,
@@ -166,6 +171,7 @@ where
         let response = self
             .http_client
             .fetch(request)
+            .await
             .map_err(GitHubClientError::Http)?;
 
         let status = response.status();
