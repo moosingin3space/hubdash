@@ -24,6 +24,8 @@ fn main() {
 #[cfg(feature = "tokio")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv::dotenv().ok();
+
     let args = Args::parse();
 
     fmt()
