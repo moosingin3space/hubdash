@@ -1,0 +1,60 @@
+# Minimal subset of the GitHub GraphQL schema covering the queries used by hubdash.
+# Full schema: https://docs.github.com/en/graphql/overview/public-schema
+
+schema {
+  query: Query
+}
+
+type Query {
+  viewer: User!
+}
+
+type User {
+  repositories(
+    first: Int!
+    ownerAffiliations: [RepositoryAffiliation!]!
+    orderBy: RepositoryOrder!
+  ): RepositoryConnection!
+}
+
+enum RepositoryAffiliation {
+  OWNER
+  COLLABORATOR
+  ORGANIZATION_MEMBER
+}
+
+input RepositoryOrder {
+  field: RepositoryOrderField!
+  direction: OrderDirection!
+}
+
+enum RepositoryOrderField {
+  PUSHED_AT
+  UPDATED_AT
+  CREATED_AT
+  NAME
+  STARGAZERS
+}
+
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+type RepositoryConnection {
+  nodes: [Repository!]!
+}
+
+type Repository {
+  databaseId: Int
+  name: String!
+  owner: RepositoryOwner!
+  description: String
+  isPrivate: Boolean!
+  url: String!
+  isFork: Boolean!
+}
+
+type RepositoryOwner {
+  login: String!
+}

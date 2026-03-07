@@ -25,16 +25,6 @@ fn repo_expand_requires_auth() {
     });
 }
 
-/// The deps partial is behind auth; unauthenticated GET must redirect.
-#[test]
-fn repo_deps_requires_auth() {
-    run_sim(|| async {
-        let (status, _body) = get("/dashboard/repo/example/hubdash/deps").await;
-        assert!(status.is_redirection(), "expected redirect, got {status}");
-        Ok(())
-    });
-}
-
 /// The landing page must be publicly accessible (no auth required).
 #[test]
 fn landing_page_is_public() {

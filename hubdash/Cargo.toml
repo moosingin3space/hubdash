@@ -37,6 +37,10 @@ hyper-rustls = { version = "0.27.7", optional = true, features = ["http2"] }
 time = "0.3"
 axum-extra = { version = "0.12", features = ["cookie"] }
 uuid = { version = "1", features = ["v4"] }
+cynic = "3"
+
+[build-dependencies]
+cynic-codegen = "3"
 
 [dev-dependencies]
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
@@ -48,6 +52,8 @@ hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] 
 http-body-util = "0.1"
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
+async-graphql = "7"
+async-graphql-axum = "7"
 
 [features]
 default = ["tokio"]
