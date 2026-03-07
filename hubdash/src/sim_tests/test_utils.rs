@@ -77,11 +77,7 @@ fn register_app_server_with_session(sim: &mut turmoil::Sim<'_>, session_id: Sess
                 .unwrap();
             let state = AppState::<SimPlatform> {
                 sessions,
-                oauth: GitHubOAuthConfig {
-                    client_id: "test-client-id".into(),
-                    client_secret: "test-client-secret".into(),
-                    ..Default::default()
-                },
+                oauth: test_oauth_config(),
                 plat: SimPlatform,
             };
             let router = create_router_with_state(state);
@@ -165,6 +161,7 @@ where
     let cookie = format!("hubdash_session={}", session_id.as_str());
     let mut sim = turmoil::Builder::new().build();
     register_app_server_with_session(&mut sim, session_id);
+    register_api_github_server(&mut sim);
     sim.client("client", client_fn(cookie));
     sim.run().unwrap();
 }

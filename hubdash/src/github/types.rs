@@ -2,59 +2,46 @@
 
 use serde::Deserialize;
 
-/// Represents an installation of the GitHub App.
+/// Response wrapper for the workflow runs list endpoint.
 #[derive(Debug, Clone, Deserialize)]
-pub struct Installation {
-    /// The unique identifier of the installation.
-    pub id: u64,
-    /// The account (user or organization) that owns the installation.
-    pub account: InstallationAccount,
-    /// The app ID associated with this installation.
-    pub app_id: u64,
-    /// Whether this installation has access to all repositories or only selected ones.
-    pub repository_selection: RepositorySelection,
-    /// URL to generate access tokens for this installation.
-    pub access_tokens_url: String,
-    /// URL to list repositories accessible to this installation.
-    pub repositories_url: String,
+pub struct WorkflowRunsResponse {
+    /// The list of workflow runs.
+    pub workflow_runs: Vec<WorkflowRun>,
 }
 
-/// The account (user or organization) that owns an installation.
+/// A single workflow run from the GitHub Actions API.
 #[derive(Debug, Clone, Deserialize)]
-pub struct InstallationAccount {
-    /// The login name of the account.
+pub struct WorkflowRun {
+    /// The name of the workflow.
+    pub name: Option<String>,
+    /// The event that triggered the run (e.g. "push", "pull_request", "schedule").
+    pub event: String,
+    /// The run status (e.g. "completed", "in_progress", "queued").
+    pub status: String,
+    /// The conclusion of a completed run (e.g. "success", "failure", "cancelled").
+    pub conclusion: Option<String>,
+    /// URL to the run on GitHub.
+    pub html_url: String,
+    /// When the run started, in ISO 8601 format.
+    pub run_started_at: Option<String>,
+    /// When the run was last updated, in ISO 8601 format.
+    pub updated_at: String,
+}
+
+/// Owner of a GitHub repository.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RepositoryOwner {
+    /// The login name of the owner.
     pub login: String,
-    /// The unique identifier of the account.
-    pub id: u64,
-    /// The type of account (User or Organization).
-    #[serde(rename = "type")]
-    pub account_type: AccountType,
 }
 
-/// Whether an installation has access to all or selected repositories.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RepositorySelection {
-    /// Access to all repositories.
-    All,
-    /// Access to selected repositories only.
-    Selected,
-}
-
-/// The type of GitHub account.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-pub enum AccountType {
-    /// A user account.
-    User,
-    /// An organization account.
-    Organization,
-}
-
-/// An access token for a GitHub App installation.
+/// A GitHub repository.
 #[derive(Debug, Clone, Deserialize)]
-pub struct InstallationAccessToken {
-    /// The access token string.
-    pub token: String,
-    /// When this token expires (ISO 8601 format).
-    pub expires_at: String,
+pub struct Repository {
+    /// The short name of the repository (e.g. "hubdash").
+    pub name: String,
+    /// The owner of the repository.
+    pub owner: RepositoryOwner,
+    /// The repository description.
+    pub description: Option<String>,
 }

@@ -26,7 +26,7 @@ fn repo_expand_returns_detail_html() {
     });
 }
 
-/// `repo_expand` for an unknown repo returns an error message.
+/// `repo_expand` for an unknown repo returns the detail shell (pipelines load lazily).
 #[test]
 fn repo_expand_unknown_repo() {
     run_authed_sim(|cookie| async move {
@@ -34,76 +34,8 @@ fn repo_expand_unknown_repo() {
             get_with_cookie("/dashboard/repo/nobody/norepo/expand", Some(&cookie)).await;
         assert_eq!(status, http::StatusCode::OK, "body: {body}");
         assert!(
-            body.contains("not found"),
-            "expected 'not found' message, got: {body}"
-        );
-        Ok(())
-    });
-}
-
-// ── repo_deps ────────────────────────────────────────────────────────────────
-
-/// `repo_deps` for a repo with dependencies returns a table with package names.
-#[test]
-fn repo_deps_returns_deps_table() {
-    run_authed_sim(|cookie| async move {
-        let (status, body) =
-            get_with_cookie("/dashboard/repo/example/hubdash/deps", Some(&cookie)).await;
-        assert_eq!(status, http::StatusCode::OK, "body: {body}");
-        assert!(
-            body.contains("deps-table"),
-            "expected deps-table class, got: {body}"
-        );
-        assert!(body.contains("axum"), "expected axum dep, got: {body}");
-        assert!(body.contains("tokio"), "expected tokio dep, got: {body}");
-        Ok(())
-    });
-}
-
-/// Outdated packages get `dep-outdated` and current ones get `dep-current`.
-#[test]
-fn repo_deps_marks_outdated_and_current() {
-    run_authed_sim(|cookie| async move {
-        let (status, body) =
-            get_with_cookie("/dashboard/repo/example/hubdash/deps", Some(&cookie)).await;
-        assert_eq!(status, http::StatusCode::OK, "body: {body}");
-        assert!(
-            body.contains("dep-outdated"),
-            "expected dep-outdated class, got: {body}"
-        );
-        assert!(
-            body.contains("dep-current"),
-            "expected dep-current class, got: {body}"
-        );
-        Ok(())
-    });
-}
-
-/// A repo with no dependencies still returns 200 with a (empty) table.
-#[test]
-fn repo_deps_empty_deps() {
-    run_authed_sim(|cookie| async move {
-        let (status, body) =
-            get_with_cookie("/dashboard/repo/example/legacy-service/deps", Some(&cookie)).await;
-        assert_eq!(status, http::StatusCode::OK, "body: {body}");
-        assert!(
-            body.contains("deps-table"),
-            "expected deps-table class, got: {body}"
-        );
-        Ok(())
-    });
-}
-
-/// `repo_deps` for an unknown repo returns an error message.
-#[test]
-fn repo_deps_unknown_repo() {
-    run_authed_sim(|cookie| async move {
-        let (status, body) =
-            get_with_cookie("/dashboard/repo/nobody/norepo/deps", Some(&cookie)).await;
-        assert_eq!(status, http::StatusCode::OK, "body: {body}");
-        assert!(
-            body.contains("not found"),
-            "expected 'not found' message, got: {body}"
+            body.contains("repo-detail"),
+            "expected repo-detail markup, got: {body}"
         );
         Ok(())
     });

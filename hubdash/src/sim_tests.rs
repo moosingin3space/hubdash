@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 mod test_utils;
 
 mod auth_tests;
