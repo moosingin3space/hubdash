@@ -21,10 +21,10 @@
 //! limits or custom expiration logic), we can migrate to the composable pools
 //! API while keeping the same `HttpClient` trait interface.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{HttpClient, Platform};
+use http_body::Body;
 use hyper_rustls::HttpsConnectorBuilder;
 use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use thiserror::Error;
@@ -56,8 +56,8 @@ pub struct HyperUtilHttpClient {
 pub enum HttpClientError {
     #[error(transparent)]
     Client(#[from] hyper_util::client::legacy::Error),
-    #[error(transparent)]
-    Body(#[from] hyper::Error),
+    #[error("{0}")]
+    Body(String),
 }
 
 impl Platform for TokioPlatform {
@@ -80,15 +80,25 @@ impl Platform for TokioPlatform {
 impl HttpClient for HyperUtilHttpClient {
     type Error = HttpClientError;
 
-    async fn fetch(
+    async fn fetch<B>(
         &self,
-        req: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, Self::Error> {
+        req: http::Request<B>,
+    ) -> Result<http::Response<impl Body<Data = bytes::Bytes>>, Self::Error>
+    where
+        B: Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: std::fmt::Display,
+    {
         let client = self.client.clone();
 
-        // Convert the Vec<u8> body to the hyper body type.
+        // Convert the body to the hyper body type.
         let (parts, body) = req.into_parts();
-        let hyper_req = http::Request::from_parts(parts, HyperBody::new(bytes::Bytes::from(body)));
+        let hyper_body = HyperBody::new(
+            http_body_util::BodyExt::collect(body)
+                .await
+                .map_err(|e| HttpClientError::Body(e.to_string()))?
+                .to_bytes(),
+        );
+        let hyper_req = http::Request::from_parts(parts, hyper_body);
 
         let resp = client
             .request(hyper_req)
@@ -97,8 +107,7 @@ impl HttpClient for HyperUtilHttpClient {
         let (parts, body) = resp.into_parts();
         let body_bytes = http_body_util::BodyExt::collect(body)
             .await
-            .map_err(HttpClientError::Body)?
-            .to_bytes();
-        Ok(http::Response::from_parts(parts, body_bytes.to_vec()))
+            .map_err(|e| HttpClientError::Body(e.to_string()))?;
+        Ok(http::Response::from_parts(parts, body_bytes))
     }
 }

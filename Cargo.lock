@@ -700,6 +700,7 @@ dependencies = [
  "clap",
  "dotenv",
  "http",
+ "http-body",
  "http-body-util",
  "hyper",
  "hyper-rustls",
@@ -715,6 +716,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "trait-variant",
  "url",
 ]
 
@@ -1983,6 +1985,17 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "trait-variant"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70977707304198400eb4835a78f6a9f928bf41bba420deb8fdb175cd965d77a7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

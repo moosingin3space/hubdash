@@ -3,6 +3,7 @@
 use crate::HttpClient;
 use http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use http::{Method, Request, StatusCode};
+use http_body_util::{BodyExt, Full};
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
@@ -132,17 +133,17 @@ where
         path: &str,
         token: &str,
         json_body: Option<&B>,
-    ) -> Result<Request<Vec<u8>>, GitHubClientError<C::Error>>
+    ) -> Result<Request<Full<bytes::Bytes>>, GitHubClientError<C::Error>>
     where
         B: Serialize,
     {
         let url = format!("{GITHUB_API_BASE}{path}");
-        let (body, has_body): (Vec<u8>, bool) = match json_body {
+        let (body, has_body): (bytes::Bytes, bool) = match json_body {
             Some(b) => {
                 let bytes = serde_json::to_vec(b).map_err(GitHubClientError::JsonSerialize)?;
-                (bytes, true)
+                (bytes::Bytes::from(bytes), true)
             }
-            None => (Vec::new(), false),
+            None => (bytes::Bytes::new(), false),
         };
 
         let mut builder = Request::builder()
@@ -157,13 +158,15 @@ where
             builder = builder.header(CONTENT_TYPE, "application/json");
         }
 
-        builder.body(body).map_err(GitHubClientError::RequestBuild)
+        builder
+            .body(Full::new(body))
+            .map_err(GitHubClientError::RequestBuild)
     }
 
     /// Executes an HTTP request and parses the JSON response.
     async fn execute_request<T>(
         &self,
-        request: Request<Vec<u8>>,
+        request: Request<Full<bytes::Bytes>>,
     ) -> Result<T, GitHubClientError<C::Error>>
     where
         T: DeserializeOwned,
@@ -175,16 +178,21 @@ where
             .map_err(GitHubClientError::Http)?;
 
         let status = response.status();
-        let body_bytes = response.body().as_ref();
+        let body_bytes = response
+            .into_body()
+            .collect()
+            .await
+            .unwrap_or_default()
+            .to_bytes();
 
         if !status.is_success() {
-            let body_str = String::from_utf8_lossy(body_bytes).into_owned();
+            let body_str = String::from_utf8_lossy(&body_bytes).into_owned();
             return Err(GitHubClientError::ApiError {
                 status,
                 body: body_str,
             });
         }
 
-        serde_json::from_slice(body_bytes).map_err(GitHubClientError::JsonParse)
+        serde_json::from_slice(&body_bytes).map_err(GitHubClientError::JsonParse)
     }
 }

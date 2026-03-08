@@ -11,6 +11,7 @@ name = "hubdash"
 
 [dependencies]
 axum = { version = "0.8.8", default-features = false, features = ["http1", "http2"] }
+http-body = "1"
 tokio = { version = "1.49.0", optional = true, features = ["full"] }
 clap = { version = "4.5.20", optional = true, features = ["derive", "env"] }
 tracing = "0.1.40"
@@ -30,6 +31,7 @@ serde_json = "1"
 thiserror = "2"
 dotenv = { version = "0.15.0", optional = true }
 hyper-rustls = { version = "0.27.7", optional = true, features = ["http2"] }
+trait-variant = "0.1.2"
 
 [dev-dependencies]
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
