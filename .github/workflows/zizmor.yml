@@ -8,19 +8,9 @@ on:
     repository_dispatch:
         types: [dagger-update-complete]
 
-permissions: {}
+permissions:
+    security-events: write
 
 jobs:
     zizmor:
-        name: Run zizmor
-        runs-on: ubuntu-latest
-        permissions:
-            security-events: write
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-              with:
-                  persist-credentials: false
-
-            - name: Run zizmor
-              uses: zizmorcore/zizmor-action@71321a20a9ded102f6e9ce5718a2fcec2c4f70d8 # v0.5.2
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/zizmor.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1
