@@ -7,6 +7,7 @@
 use std::error::Error;
 
 use axum::{Router, routing::get};
+use http_body::Body;
 
 mod assets;
 mod dashboard;
@@ -38,21 +39,25 @@ pub fn create_router(plat: impl Platform) -> Router {
 }
 
 /// Represents an HTTP Client interface.
-pub trait HttpClient {
+#[trait_variant::make(HttpClient: Send)]
+pub trait LocalHttpClient {
     /// The type of error this platform can return.
     type Error: Error;
 
     /// Fetches
-    fn fetch(
+    fn fetch<B>(
         &self,
-        req: http::Request<Vec<u8>>,
-    ) -> impl Future<Output = Result<http::Response<Vec<u8>>, Self::Error>> + Send;
+        req: http::Request<B>,
+    ) -> impl Future<Output = Result<http::Response<impl Body<Data = bytes::Bytes>>, Self::Error>>
+    where
+        B: Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: std::fmt::Display;
 }
 
 /// Represents a Platform that HubDash can run on.
 pub trait Platform {
     /// The type of HTTP client this platform supports.
-    type HttpClient: HttpClient;
+    type HttpClient: LocalHttpClient;
 
     /// Creates a new HTTP client for this platform.
     fn create_http_client(&self) -> Self::HttpClient;
