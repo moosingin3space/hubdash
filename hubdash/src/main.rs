@@ -44,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let oauth = hubdash::GitHubOAuthConfig {
         client_id: args.github_client_id,
         client_secret: args.github_client_secret,
+        ..Default::default()
     };
     let router = hubdash::create_router(platform, oauth);
     let listener = tokio::net::TcpListener::bind(args.bind_address).await?;

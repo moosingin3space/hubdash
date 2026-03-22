@@ -21,6 +21,25 @@ pub struct GitHubOAuthConfig {
     pub client_id: String,
     /// The GitHub App's client secret.
     pub client_secret: String,
+    /// Base URL for github.com — overridable for testing.
+    ///
+    /// Defaults to `"https://github.com"`.
+    pub github_base_url: String,
+    /// Base URL for the GitHub REST API — overridable for testing.
+    ///
+    /// Defaults to `"https://api.github.com"`.
+    pub api_base_url: String,
+}
+
+impl Default for GitHubOAuthConfig {
+    fn default() -> Self {
+        Self {
+            client_id: String::new(),
+            client_secret: String::new(),
+            github_base_url: "https://github.com".into(),
+            api_base_url: "https://api.github.com".into(),
+        }
+    }
 }
 
 /// Errors that can occur during the OAuth flow.
@@ -80,9 +99,10 @@ where
     ];
     let body = serde_urlencoded::to_string(params).map_err(OAuthError::FormEncode)?;
 
+    let token_url = format!("{}/login/oauth/access_token", config.github_base_url);
     let request = Request::builder()
         .method(Method::POST)
-        .uri("https://github.com/login/oauth/access_token")
+        .uri(token_url)
         .header(ACCEPT, "application/json")
         .header(
             http::header::CONTENT_TYPE,
@@ -122,14 +142,16 @@ where
 /// Fetches the authenticated user's information from GitHub.
 pub async fn fetch_user<C>(
     http_client: &C,
+    config: &GitHubOAuthConfig,
     access_token: &str,
 ) -> Result<GitHubUser, OAuthError<C::Error>>
 where
     C: HttpClient,
 {
+    let user_url = format!("{}/user", config.api_base_url);
     let request = Request::builder()
         .method(Method::GET)
-        .uri("https://api.github.com/user")
+        .uri(user_url)
         .header(ACCEPT, "application/vnd.github+json")
         .header(AUTHORIZATION, format!("Bearer {access_token}"))
         .header(USER_AGENT, "hubdash")

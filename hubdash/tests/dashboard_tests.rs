@@ -44,6 +44,7 @@ fn register_app_with_session(
                 oauth: GitHubOAuthConfig {
                     client_id: "test-client-id".into(),
                     client_secret: "test-client-secret".into(),
+                    ..Default::default()
                 },
                 plat: SimPlatform,
             };

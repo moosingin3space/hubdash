@@ -43,8 +43,8 @@ async fn signin<P: Platform>(
         .build();
 
     let redirect_url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&state={}",
-        state.oauth.client_id, oauth_state,
+        "{}/login/oauth/authorize?client_id={}&state={}",
+        state.oauth.github_base_url, state.oauth.client_id, oauth_state,
     );
 
     (jar.add(state_cookie), Redirect::to(&redirect_url))
@@ -79,7 +79,7 @@ where
         };
 
     // Fetch user info from GitHub.
-    let user = match oauth::fetch_user(&http_client, &access_token).await {
+    let user = match oauth::fetch_user(&http_client, &state.oauth, &access_token).await {
         Ok(user) => user,
         Err(e) => {
             error!("Failed to fetch user info: {e:?}");
