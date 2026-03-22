@@ -10,6 +10,7 @@ use http::{Method, Request, StatusCode};
 use http_body_util::{BodyExt, Full};
 use serde::Deserialize;
 use thiserror::Error;
+use url::Url;
 
 use crate::HttpClient;
 use crate::session::GitHubUser;
@@ -24,11 +25,11 @@ pub struct GitHubOAuthConfig {
     /// Base URL for github.com — overridable for testing.
     ///
     /// Defaults to `"https://github.com"`.
-    pub github_base_url: String,
+    pub github_base_url: Url,
     /// Base URL for the GitHub REST API — overridable for testing.
     ///
     /// Defaults to `"https://api.github.com"`.
-    pub api_base_url: String,
+    pub api_base_url: Url,
 }
 
 impl Default for GitHubOAuthConfig {
@@ -36,8 +37,8 @@ impl Default for GitHubOAuthConfig {
         Self {
             client_id: String::new(),
             client_secret: String::new(),
-            github_base_url: "https://github.com".into(),
-            api_base_url: "https://api.github.com".into(),
+            github_base_url: Url::parse("https://github.com").expect("hardcoded URL is valid"),
+            api_base_url: Url::parse("https://api.github.com").expect("hardcoded URL is valid"),
         }
     }
 }
@@ -99,10 +100,13 @@ where
     ];
     let body = serde_urlencoded::to_string(params).map_err(OAuthError::FormEncode)?;
 
-    let token_url = format!("{}/login/oauth/access_token", config.github_base_url);
+    let token_url = config
+        .github_base_url
+        .join("/login/oauth/access_token")
+        .expect("valid path join");
     let request = Request::builder()
         .method(Method::POST)
-        .uri(token_url)
+        .uri(token_url.as_str())
         .header(ACCEPT, "application/json")
         .header(
             http::header::CONTENT_TYPE,
@@ -148,10 +152,10 @@ pub async fn fetch_user<C>(
 where
     C: HttpClient,
 {
-    let user_url = format!("{}/user", config.api_base_url);
+    let user_url = config.api_base_url.join("/user").expect("valid path join");
     let request = Request::builder()
         .method(Method::GET)
-        .uri(user_url)
+        .uri(user_url.as_str())
         .header(ACCEPT, "application/vnd.github+json")
         .header(AUTHORIZATION, format!("Bearer {access_token}"))
         .header(USER_AGENT, "hubdash")

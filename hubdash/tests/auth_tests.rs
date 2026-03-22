@@ -15,10 +15,7 @@ fn dashboard_requires_auth() {
 
     sim.client("client", async {
         let (status, _body) = get("/dashboard").await;
-        assert!(
-            status.is_redirection(),
-            "expected redirect, got {status}"
-        );
+        assert!(status.is_redirection(), "expected redirect, got {status}");
         Ok(())
     });
 
@@ -33,10 +30,7 @@ fn repo_expand_requires_auth() {
 
     sim.client("client", async {
         let (status, _body) = get("/dashboard/repo/example/hubdash/expand").await;
-        assert!(
-            status.is_redirection(),
-            "expected redirect, got {status}"
-        );
+        assert!(status.is_redirection(), "expected redirect, got {status}");
         Ok(())
     });
 
@@ -51,10 +45,7 @@ fn repo_deps_requires_auth() {
 
     sim.client("client", async {
         let (status, _body) = get("/dashboard/repo/example/hubdash/deps").await;
-        assert!(
-            status.is_redirection(),
-            "expected redirect, got {status}"
-        );
+        assert!(status.is_redirection(), "expected redirect, got {status}");
         Ok(())
     });
 
@@ -70,7 +61,10 @@ fn landing_page_is_public() {
     sim.client("client", async {
         let (status, body) = get("/").await;
         assert_eq!(status, http::StatusCode::OK);
-        assert!(body.contains("Hubdash"), "landing page should contain 'Hubdash'");
+        assert!(
+            body.contains("Hubdash"),
+            "landing page should contain 'Hubdash'"
+        );
         Ok(())
     });
 

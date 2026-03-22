@@ -13,11 +13,10 @@
 
 mod test_utils;
 
+use test_utils::mock_github::{MOCK_ACCESS_TOKEN, MOCK_USER_LOGIN};
 use test_utils::{
-    register_api_github_server, register_app_server, register_github_server,
-    request_with_cookie,
+    register_api_github_server, register_app_server, register_github_server, request_with_cookie,
 };
-use test_utils::mock_github::{MOCK_USER_LOGIN, MOCK_ACCESS_TOKEN};
 
 /// The OAuth state value used across tests.
 const TEST_STATE: &str = "test-oauth-state-abc123";
@@ -65,10 +64,11 @@ fn callback_happy_path_redirects_to_dashboard() {
         assert_eq!(location, "/dashboard", "should redirect to /dashboard");
 
         let cookies = set_cookies(&headers);
-        let has_session = cookies
-            .iter()
-            .any(|c| c.starts_with("hubdash_session="));
-        assert!(has_session, "response should set hubdash_session cookie; got {cookies:?}");
+        let has_session = cookies.iter().any(|c| c.starts_with("hubdash_session="));
+        assert!(
+            has_session,
+            "response should set hubdash_session cookie; got {cookies:?}"
+        );
 
         Ok(())
     });
@@ -101,12 +101,7 @@ fn callback_session_cookie_grants_dashboard_access() {
             .expect("should have session cookie after callback");
 
         // Extract just the name=value part (strip attributes like Path=/, etc.)
-        let session_kv = session_header
-            .split(';')
-            .next()
-            .unwrap()
-            .trim()
-            .to_owned();
+        let session_kv = session_header.split(';').next().unwrap().trim().to_owned();
 
         // Step 2: use the session cookie to access the dashboard.
         let (dashboard_status, _body) =
@@ -148,7 +143,10 @@ fn callback_session_stores_correct_user() {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         // A redirect to "/" means something went wrong; "/dashboard" is success.
-        assert_eq!(location, "/dashboard", "got error redirect instead of /dashboard");
+        assert_eq!(
+            location, "/dashboard",
+            "got error redirect instead of /dashboard"
+        );
 
         Ok(())
     });

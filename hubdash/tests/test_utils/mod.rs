@@ -11,6 +11,7 @@ use http_body_util::{BodyExt, Full};
 use hubdash::{GitHubOAuthConfig, create_router};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
+use url::Url;
 
 use connector::{SimConnector, sim_listen};
 use mock_github::{API_GITHUB_HOST, mock_api_github_router, mock_github_router};
@@ -33,20 +34,19 @@ pub fn test_oauth_config() -> GitHubOAuthConfig {
     GitHubOAuthConfig {
         client_id: "test-client-id".into(),
         client_secret: "test-client-secret".into(),
-        github_base_url: format!("http://{}:{}", GITHUB_HOST, GITHUB_PORT),
-        api_base_url: format!("http://{}:{}", API_GITHUB_HOST, GITHUB_PORT),
+        github_base_url: Url::parse(&format!("http://{}:{}", GITHUB_HOST, GITHUB_PORT))
+            .expect("valid test URL"),
+        api_base_url: Url::parse(&format!("http://{}:{}", API_GITHUB_HOST, GITHUB_PORT))
+            .expect("valid test URL"),
     }
 }
 
 /// Registers the hubdash app server host in a turmoil simulation.
 pub fn register_app_server(sim: &mut turmoil::Sim<'_>) {
     sim.host(APP_HOST, || async {
-        let listener = sim_listen(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            APP_PORT,
-        ))
-        .await
-        .unwrap();
+        let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
+            .await
+            .unwrap();
         let router = create_router(SimPlatform, test_oauth_config());
         axum::serve(listener, router).await.unwrap();
         Ok(())
@@ -54,19 +54,13 @@ pub fn register_app_server(sim: &mut turmoil::Sim<'_>) {
 }
 
 /// Registers a hubdash app server with a pre-built OAuth config.
-pub fn register_app_server_with_config(
-    sim: &mut turmoil::Sim<'_>,
-    oauth: GitHubOAuthConfig,
-) {
+pub fn register_app_server_with_config(sim: &mut turmoil::Sim<'_>, oauth: GitHubOAuthConfig) {
     sim.host(APP_HOST, move || {
         let oauth = oauth.clone();
         async move {
-            let listener = sim_listen(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                APP_PORT,
-            ))
-            .await
-            .unwrap();
+            let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
+                .await
+                .unwrap();
             let router = create_router(SimPlatform, oauth);
             axum::serve(listener, router).await.unwrap();
             Ok(())
@@ -97,7 +91,9 @@ pub fn register_api_github_server(sim: &mut turmoil::Sim<'_>) {
         ))
         .await
         .unwrap();
-        axum::serve(listener, mock_api_github_router()).await.unwrap();
+        axum::serve(listener, mock_api_github_router())
+            .await
+            .unwrap();
         Ok(())
     });
 }
@@ -108,10 +104,7 @@ pub async fn get(path: &str) -> (http::StatusCode, String) {
 }
 
 /// Sends a GET request with an optional `Cookie` header value.
-pub async fn get_with_cookie(
-    path: &str,
-    cookie: Option<&str>,
-) -> (http::StatusCode, String) {
+pub async fn get_with_cookie(path: &str, cookie: Option<&str>) -> (http::StatusCode, String) {
     let (status, _headers, body) = request_with_cookie(path, cookie).await;
     (status, body)
 }
@@ -128,9 +121,7 @@ pub async fn request_with_cookie(
 
     let uri = format!("http://{}:{}{}", APP_HOST, APP_PORT, path);
 
-    let mut builder = http::Request::builder()
-        .method(http::Method::GET)
-        .uri(&uri);
+    let mut builder = http::Request::builder().method(http::Method::GET).uri(&uri);
 
     if let Some(c) = cookie {
         builder = builder.header(http::header::COOKIE, c);
@@ -141,12 +132,7 @@ pub async fn request_with_cookie(
     let resp = client.request(req).await.unwrap();
     let status = resp.status();
     let headers = resp.headers().clone();
-    let body = resp
-        .into_body()
-        .collect()
-        .await
-        .unwrap()
-        .to_bytes();
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
     let body_str = String::from_utf8_lossy(&body).into_owned();
     (status, headers, body_str)
 }

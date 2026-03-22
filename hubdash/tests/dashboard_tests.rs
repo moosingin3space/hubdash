@@ -18,10 +18,7 @@ const APP_HOST: &str = "hubdash";
 /// Registers a hubdash server host with a single pre-seeded session.
 ///
 /// Returns the `SessionId` so the test client can craft the correct cookie.
-fn register_app_with_session(
-    sim: &mut turmoil::Sim<'_>,
-    session_id: SessionId,
-) {
+fn register_app_with_session(sim: &mut turmoil::Sim<'_>, session_id: SessionId) {
     sim.host(APP_HOST, move || {
         let session_id = session_id.clone();
         async move {
@@ -50,12 +47,9 @@ fn register_app_with_session(
             };
 
             let router = create_router_with_state(state);
-            let listener = sim_listen(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                APP_PORT,
-            ))
-            .await
-            .unwrap();
+            let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
+                .await
+                .unwrap();
             axum::serve(listener, router).await.unwrap();
             Ok(())
         }
@@ -184,12 +178,11 @@ fn repo_deps_empty_deps() {
 
     let cookie = session_cookie(&sid);
     sim.client("client", async move {
-        let (status, body) =
-            test_utils::get_with_cookie(
-                "/dashboard/repo/example/legacy-service/deps",
-                Some(&cookie),
-            )
-            .await;
+        let (status, body) = test_utils::get_with_cookie(
+            "/dashboard/repo/example/legacy-service/deps",
+            Some(&cookie),
+        )
+        .await;
         assert_eq!(status, http::StatusCode::OK, "body: {body}");
         // The deps table is still rendered, just with an empty tbody.
         assert!(
@@ -212,8 +205,7 @@ fn repo_deps_unknown_repo() {
     let cookie = session_cookie(&sid);
     sim.client("client", async move {
         let (status, body) =
-            test_utils::get_with_cookie("/dashboard/repo/nobody/norepo/deps", Some(&cookie))
-                .await;
+            test_utils::get_with_cookie("/dashboard/repo/nobody/norepo/deps", Some(&cookie)).await;
         assert_eq!(status, http::StatusCode::OK, "body: {body}");
         assert!(
             body.contains("not found"),
@@ -236,16 +228,21 @@ fn dashboard_page_lists_repos() {
 
     let cookie = session_cookie(&sid);
     sim.client("client", async move {
-        let (status, body) =
-            test_utils::get_with_cookie("/dashboard", Some(&cookie)).await;
+        let (status, body) = test_utils::get_with_cookie("/dashboard", Some(&cookie)).await;
         assert_eq!(status, http::StatusCode::OK, "body: {body}");
         assert!(
             body.contains("repo-table"),
             "expected repo-table, got: {body}"
         );
         assert!(body.contains("hubdash"), "expected hubdash repo row");
-        assert!(body.contains("api-gateway"), "expected api-gateway repo row");
-        assert!(body.contains("frontend-app"), "expected frontend-app repo row");
+        assert!(
+            body.contains("api-gateway"),
+            "expected api-gateway repo row"
+        );
+        assert!(
+            body.contains("frontend-app"),
+            "expected frontend-app repo row"
+        );
         Ok(())
     });
 
