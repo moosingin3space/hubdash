@@ -13,7 +13,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 
 use connector::{SimConnector, sim_listen};
-use mock_github::mock_github_router;
+use mock_github::{API_GITHUB_HOST, mock_api_github_router, mock_github_router};
 use platform::SimPlatform;
 
 /// Port the hubdash app server listens on inside simulations.
@@ -23,14 +23,18 @@ pub const GITHUB_PORT: u16 = 80;
 
 /// Hostname for the hubdash app inside the turmoil simulation.
 pub const APP_HOST: &str = "hubdash";
-/// Hostname for the mock GitHub server inside the turmoil simulation.
+/// Hostname for the mock github.com inside the turmoil simulation.
 pub const GITHUB_HOST: &str = "github.com";
 
-/// Builds the OAuth config pointing to the turmoil mock server.
+/// Builds the OAuth config pointing to the in-simulation mock servers.
+///
+/// Uses plain HTTP so turmoil can intercept the connections without TLS.
 pub fn test_oauth_config() -> GitHubOAuthConfig {
     GitHubOAuthConfig {
         client_id: "test-client-id".into(),
         client_secret: "test-client-secret".into(),
+        github_base_url: format!("http://{}:{}", GITHUB_HOST, GITHUB_PORT),
+        api_base_url: format!("http://{}:{}", API_GITHUB_HOST, GITHUB_PORT),
     }
 }
 
@@ -49,7 +53,28 @@ pub fn register_app_server(sim: &mut turmoil::Sim<'_>) {
     });
 }
 
-/// Registers the mock GitHub server host in a turmoil simulation.
+/// Registers a hubdash app server with a pre-built OAuth config.
+pub fn register_app_server_with_config(
+    sim: &mut turmoil::Sim<'_>,
+    oauth: GitHubOAuthConfig,
+) {
+    sim.host(APP_HOST, move || {
+        let oauth = oauth.clone();
+        async move {
+            let listener = sim_listen(SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                APP_PORT,
+            ))
+            .await
+            .unwrap();
+            let router = create_router(SimPlatform, oauth);
+            axum::serve(listener, router).await.unwrap();
+            Ok(())
+        }
+    });
+}
+
+/// Registers the mock `github.com` host (OAuth token endpoint).
 pub fn register_github_server(sim: &mut turmoil::Sim<'_>) {
     sim.host(GITHUB_HOST, || async {
         let listener = sim_listen(SocketAddr::new(
@@ -59,6 +84,20 @@ pub fn register_github_server(sim: &mut turmoil::Sim<'_>) {
         .await
         .unwrap();
         axum::serve(listener, mock_github_router()).await.unwrap();
+        Ok(())
+    });
+}
+
+/// Registers the mock `api.github.com` host (user info endpoint).
+pub fn register_api_github_server(sim: &mut turmoil::Sim<'_>) {
+    sim.host(API_GITHUB_HOST, || async {
+        let listener = sim_listen(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            GITHUB_PORT,
+        ))
+        .await
+        .unwrap();
+        axum::serve(listener, mock_api_github_router()).await.unwrap();
         Ok(())
     });
 }
@@ -73,6 +112,17 @@ pub async fn get_with_cookie(
     path: &str,
     cookie: Option<&str>,
 ) -> (http::StatusCode, String) {
+    let (status, _headers, body) = request_with_cookie(path, cookie).await;
+    (status, body)
+}
+
+/// Sends a GET request and returns `(status, response_headers, body_string)`.
+///
+/// Use this when you need to inspect `Set-Cookie` or other response headers.
+pub async fn request_with_cookie(
+    path: &str,
+    cookie: Option<&str>,
+) -> (http::StatusCode, http::HeaderMap, String) {
     let client: Client<SimConnector, Full<bytes::Bytes>> =
         Client::builder(TokioExecutor::new()).build(SimConnector);
 
@@ -90,6 +140,7 @@ pub async fn get_with_cookie(
 
     let resp = client.request(req).await.unwrap();
     let status = resp.status();
+    let headers = resp.headers().clone();
     let body = resp
         .into_body()
         .collect()
@@ -97,5 +148,5 @@ pub async fn get_with_cookie(
         .unwrap()
         .to_bytes();
     let body_str = String::from_utf8_lossy(&body).into_owned();
-    (status, body_str)
+    (status, headers, body_str)
 }
