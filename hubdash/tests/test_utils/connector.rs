@@ -25,8 +25,7 @@ pub struct SimListener(pub TcpListener);
 pub struct SimStream(pub TcpStream);
 
 /// Future type returned by the connector service.
-pub type ConnectFuture =
-    Pin<Box<dyn Future<Output = io::Result<TokioIo<SimStream>>> + Send>>;
+pub type ConnectFuture = Pin<Box<dyn Future<Output = io::Result<TokioIo<SimStream>>> + Send>>;
 
 /// A zero-size connector that routes connections through turmoil's TCP stack.
 ///
@@ -46,8 +45,12 @@ impl Service<Uri> for SimConnector {
 
     fn call(&mut self, uri: Uri) -> Self::Future {
         Box::pin(async move {
-            let addr = uri.authority().unwrap().as_str();
-            let stream = TcpStream::connect(addr).await?;
+            let host = uri.host().unwrap_or("localhost");
+            let port = uri.port_u16().unwrap_or_else(|| match uri.scheme_str() {
+                Some("https") => 443,
+                _ => 80,
+            });
+            let stream = TcpStream::connect(format!("{host}:{port}")).await?;
             Ok(TokioIo::new(SimStream(stream)))
         })
     }
@@ -102,10 +105,7 @@ impl AsyncWrite for SimStream {
         Pin::new(&mut self.0).poll_flush(cx)
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Pin::new(&mut self.0).poll_shutdown(cx)
     }
 }

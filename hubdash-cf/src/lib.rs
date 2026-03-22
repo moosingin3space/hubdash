@@ -104,6 +104,7 @@ async fn fetch(
     let oauth = GitHubOAuthConfig {
         client_id: env.var("GITHUB_CLIENT_ID")?.to_string(),
         client_secret: env.var("GITHUB_CLIENT_SECRET")?.to_string(),
+        ..Default::default()
     };
 
     let mut router = hubdash::create_router(CloudflarePlatform, oauth);

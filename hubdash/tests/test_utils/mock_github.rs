@@ -20,8 +20,11 @@
 //! register_api_github_server(&mut sim); // api.github.com:80
 //! ```
 
-use axum::{Router, routing::{get, post}};
 use axum::response::IntoResponse;
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use http::StatusCode;
 
 /// The canned access token the mock token endpoint issues.

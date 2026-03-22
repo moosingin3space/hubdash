@@ -77,6 +77,12 @@ impl InMemorySessionStore {
     }
 }
 
+impl Default for InMemorySessionStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionStore for InMemorySessionStore {
     fn put(&self, session: Session) -> Result<(), SessionStoreError> {
         let mut store = self

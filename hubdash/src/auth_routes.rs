@@ -42,12 +42,17 @@ async fn signin<P: Platform>(
         .max_age(time::Duration::minutes(10))
         .build();
 
-    let redirect_url = format!(
-        "{}/login/oauth/authorize?client_id={}&state={}",
-        state.oauth.github_base_url, state.oauth.client_id, oauth_state,
-    );
+    let mut authorize_url = state
+        .oauth
+        .github_base_url
+        .join("/login/oauth/authorize")
+        .expect("valid path join");
+    authorize_url
+        .query_pairs_mut()
+        .append_pair("client_id", &state.oauth.client_id)
+        .append_pair("state", &oauth_state);
 
-    (jar.add(state_cookie), Redirect::to(&redirect_url))
+    (jar.add(state_cookie), Redirect::to(authorize_url.as_str()))
 }
 
 /// Handles the OAuth callback from GitHub.
