@@ -24,7 +24,7 @@ mod platform;
 pub mod session;
 
 #[cfg(feature = "tokio")]
-pub use platform::tokio::TokioPlatform;
+pub use platform::tokio::{InMemorySessionStore, TokioPlatform};
 
 pub use github::GitHubOAuthConfig;
 pub use session::SessionStore;
@@ -48,7 +48,19 @@ pub fn create_router<P: Platform>(plat: P, oauth: GitHubOAuthConfig) -> Router {
         oauth,
         plat,
     };
+    build_router(state)
+}
 
+/// Creates an Axum router from a pre-built [`AppState`].
+///
+/// This variant is useful in tests where the session store must be
+/// pre-seeded before the server starts.
+pub fn create_router_with_state<P: Platform>(state: AppState<P>) -> Router {
+    build_router(state)
+}
+
+/// Internal helper that wires up all routes for a given `AppState`.
+fn build_router<P: Platform>(state: AppState<P>) -> Router {
     let dashboard_routes = Router::new()
         .route("/", get(dashboard::dashboard_page))
         .route("/repo/{owner}/{repo}/expand", get(dashboard::repo_expand))
