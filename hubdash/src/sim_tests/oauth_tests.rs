@@ -11,10 +11,8 @@
 //! the `hubdash_oauth_state` cookie.  Tests inject both to a known value
 //! directly rather than going through `/auth/signin` first.
 
-mod test_utils;
-
-use test_utils::mock_github::{MOCK_ACCESS_TOKEN, MOCK_USER_LOGIN};
-use test_utils::{get_with_cookie, request_with_cookie, run_github_sim, run_sim};
+use super::test_utils::mock_github::{MOCK_ACCESS_TOKEN, MOCK_USER_LOGIN};
+use super::test_utils::{get_with_cookie, request_with_cookie, run_github_sim, run_sim};
 
 /// The OAuth state value used across tests.
 const TEST_STATE: &str = "test-oauth-state-abc123";
