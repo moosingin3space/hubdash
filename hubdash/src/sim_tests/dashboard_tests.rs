@@ -3,9 +3,7 @@
 //! Each test pre-seeds a valid session via [`run_authed_sim`], which passes
 //! the ready-to-use `Cookie` header value to the client closure.
 
-mod test_utils;
-
-use test_utils::{get_with_cookie, run_authed_sim};
+use super::test_utils::{get_with_cookie, run_authed_sim};
 
 // ── repo_expand ──────────────────────────────────────────────────────────────
 

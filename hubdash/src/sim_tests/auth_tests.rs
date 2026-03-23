@@ -3,9 +3,7 @@
 //! Verifies that routes under `/dashboard` redirect unauthenticated requests
 //! to `/` and allow access when a valid session cookie is present.
 
-mod test_utils;
-
-use test_utils::{get, run_sim};
+use super::test_utils::{get, run_sim};
 
 /// Dashboard root is behind auth; unauthenticated GET must redirect.
 #[test]

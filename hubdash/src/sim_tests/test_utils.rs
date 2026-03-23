@@ -1,5 +1,4 @@
 //! Shared test utilities for hubdash integration tests.
-#![allow(dead_code)]
 
 pub mod connector;
 pub mod mock_github;
@@ -8,11 +7,11 @@ pub mod platform;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use http_body_util::{BodyExt, Full};
-use hubdash::session::{GitHubUser, Session, SessionId, SessionStore as _};
-use hubdash::{
+use crate::session::{GitHubUser, Session, SessionId, SessionStore as _};
+use crate::{
     AppState, GitHubOAuthConfig, InMemorySessionStore, create_router, create_router_with_state,
 };
+use http_body_util::{BodyExt, Full};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use url::Url;

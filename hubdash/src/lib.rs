@@ -23,6 +23,9 @@ mod mocks;
 mod platform;
 pub mod session;
 
+#[cfg(test)]
+mod sim_tests;
+
 #[cfg(feature = "tokio")]
 pub use platform::tokio::{InMemorySessionStore, TokioPlatform};
 

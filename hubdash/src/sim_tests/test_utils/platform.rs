@@ -6,10 +6,10 @@
 
 use std::sync::Arc;
 
+use crate::InMemorySessionStore;
+use crate::{HttpClient, Platform};
 use http_body::Body;
 use http_body_util::{BodyExt, Full};
-use hubdash::InMemorySessionStore;
-use hubdash::{HttpClient, Platform};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use thiserror::Error;
