@@ -1,0 +1,57 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: ["**"]
+    repository_dispatch:
+        types: [dagger-update-complete]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1
+        with:
+            dagger-version: "0.20.3"
+            call: lint
+        secrets:
+            dagger-cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+
+    test:
+        needs: lint
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1
+        with:
+            dagger-version: "0.20.3"
+            call: test
+        secrets:
+            dagger-cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+
+    test-cf:
+        needs: test
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1
+        with:
+            dagger-version: "0.20.3"
+            call: cf-worker-test
+        secrets:
+            dagger-cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+
+    deploy-cf:
+        name: Deploy Cloudflare Worker
+        needs: test-cf
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1
+        with:
+            dagger-version: "0.20.3"
+            environment: production
+            call: deploy-cf-worker --cloudflare-api-token=env:CLOUDFLARE_API_TOKEN --cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID
+        secrets:
+            dagger-cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+            cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+            cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

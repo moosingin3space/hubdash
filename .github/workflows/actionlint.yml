@@ -1,0 +1,16 @@
+name: GitHub Actions Lint with actionlint
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: ["**"]
+    repository_dispatch:
+        types: [dagger-update-complete]
+
+permissions:
+    contents: read
+
+jobs:
+    actionlint:
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/actionlint.yml@2d700e4ca7d9cb9226c805c2791ba004d9e627a2 # v1.1

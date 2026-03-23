@@ -10,6 +10,8 @@ use std::future::Future;
 use axum::{Router, middleware, routing::get};
 use http_body::Body;
 
+pub use axum;
+
 mod assets;
 mod auth_middleware;
 mod auth_routes;
