@@ -9,7 +9,10 @@ use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use http_body_util::{BodyExt, Full};
-use hubdash::{GitHubOAuthConfig, create_router};
+use hubdash::session::{GitHubUser, Session, SessionId, SessionStore as _};
+use hubdash::{
+    AppState, GitHubOAuthConfig, InMemorySessionStore, create_router, create_router_with_state,
+};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use url::Url;
@@ -52,6 +55,42 @@ fn register_app_server(sim: &mut turmoil::Sim<'_>) {
         let router = create_router(SimPlatform, test_oauth_config());
         axum::serve(listener, router).await.unwrap();
         Ok(())
+    });
+}
+
+fn register_app_server_with_session(sim: &mut turmoil::Sim<'_>, session_id: SessionId) {
+    sim.host(APP_HOST, move || {
+        let session_id = session_id.clone();
+        async move {
+            let sessions = InMemorySessionStore::new();
+            sessions
+                .put(Session {
+                    id: session_id.clone(),
+                    user: GitHubUser {
+                        id: 1,
+                        login: "test-user".into(),
+                        name: Some("Test User".into()),
+                        avatar_url: None,
+                    },
+                    access_token: "fake-access-token".into(),
+                })
+                .unwrap();
+            let state = AppState::<SimPlatform> {
+                sessions,
+                oauth: GitHubOAuthConfig {
+                    client_id: "test-client-id".into(),
+                    client_secret: "test-client-secret".into(),
+                    ..Default::default()
+                },
+                plat: SimPlatform,
+            };
+            let router = create_router_with_state(state);
+            let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
+                .await
+                .unwrap();
+            axum::serve(listener, router).await.unwrap();
+            Ok(())
+        }
     });
 }
 
@@ -111,6 +150,22 @@ where
     register_github_server(&mut sim);
     register_api_github_server(&mut sim);
     sim.client("client", client_fn());
+    sim.run().unwrap();
+}
+
+/// Runs a turmoil simulation with the hubdash app server pre-seeded with a
+/// valid session, then calls `client_fn` with the ready-to-use `Cookie`
+/// header value for that session.
+pub fn run_authed_sim<F, Fut>(client_fn: F)
+where
+    F: FnOnce(String) -> Fut,
+    Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
+{
+    let session_id = SessionId::new();
+    let cookie = format!("hubdash_session={}", session_id.as_str());
+    let mut sim = turmoil::Builder::new().build();
+    register_app_server_with_session(&mut sim, session_id);
+    sim.client("client", client_fn(cookie));
     sim.run().unwrap();
 }
 
