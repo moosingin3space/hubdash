@@ -14,9 +14,7 @@
 mod test_utils;
 
 use test_utils::mock_github::{MOCK_ACCESS_TOKEN, MOCK_USER_LOGIN};
-use test_utils::{
-    register_api_github_server, register_app_server, register_github_server, request_with_cookie,
-};
+use test_utils::{get_with_cookie, request_with_cookie, run_github_sim, run_sim};
 
 /// The OAuth state value used across tests.
 const TEST_STATE: &str = "test-oauth-state-abc123";
@@ -41,15 +39,10 @@ fn set_cookies(headers: &http::HeaderMap) -> Vec<String> {
 /// should redirect to `/dashboard` and set a session cookie.
 #[test]
 fn callback_happy_path_redirects_to_dashboard() {
-    let mut sim = turmoil::Builder::new().build();
-    register_app_server(&mut sim);
-    register_github_server(&mut sim);
-    register_api_github_server(&mut sim);
-
     let cookie = state_cookie(TEST_STATE);
     let path = format!("/auth/callback?code=fake-code&state={TEST_STATE}");
 
-    sim.client("client", async move {
+    run_github_sim(|| async move {
         let (status, headers, _body) = request_with_cookie(&path, Some(&cookie)).await;
 
         assert!(
@@ -72,23 +65,16 @@ fn callback_happy_path_redirects_to_dashboard() {
 
         Ok(())
     });
-
-    sim.run().unwrap();
 }
 
 /// After the happy-path callback, the session cookie must grant access to
 /// a protected route.
 #[test]
 fn callback_session_cookie_grants_dashboard_access() {
-    let mut sim = turmoil::Builder::new().build();
-    register_app_server(&mut sim);
-    register_github_server(&mut sim);
-    register_api_github_server(&mut sim);
-
     let state_cookie_val = state_cookie(TEST_STATE);
     let callback_path = format!("/auth/callback?code=fake-code&state={TEST_STATE}");
 
-    sim.client("client", async move {
+    run_github_sim(|| async move {
         // Step 1: complete the OAuth callback.
         let (_status, headers, _body) =
             request_with_cookie(&callback_path, Some(&state_cookie_val)).await;
@@ -104,8 +90,7 @@ fn callback_session_cookie_grants_dashboard_access() {
         let session_kv = session_header.split(';').next().unwrap().trim().to_owned();
 
         // Step 2: use the session cookie to access the dashboard.
-        let (dashboard_status, _body) =
-            test_utils::get_with_cookie("/dashboard", Some(&session_kv)).await;
+        let (dashboard_status, _body) = get_with_cookie("/dashboard", Some(&session_kv)).await;
         assert_eq!(
             dashboard_status,
             http::StatusCode::OK,
@@ -114,8 +99,6 @@ fn callback_session_cookie_grants_dashboard_access() {
 
         Ok(())
     });
-
-    sim.run().unwrap();
 }
 
 /// The session token stored in the session should match the mock's token.
@@ -124,15 +107,10 @@ fn callback_session_stores_correct_user() {
     let _ = MOCK_USER_LOGIN; // used in doc / future assertions
     let _ = MOCK_ACCESS_TOKEN;
 
-    let mut sim = turmoil::Builder::new().build();
-    register_app_server(&mut sim);
-    register_github_server(&mut sim);
-    register_api_github_server(&mut sim);
-
     let state_cookie_val = state_cookie(TEST_STATE);
     let callback_path = format!("/auth/callback?code=fake-code&state={TEST_STATE}");
 
-    sim.client("client", async move {
+    run_github_sim(|| async move {
         // Complete the callback — we just verify no error redirect occurs.
         let (status, headers, _body) =
             request_with_cookie(&callback_path, Some(&state_cookie_val)).await;
@@ -150,8 +128,6 @@ fn callback_session_stores_correct_user() {
 
         Ok(())
     });
-
-    sim.run().unwrap();
 }
 
 // ── CSRF protection ──────────────────────────────────────────────────────────
@@ -160,15 +136,12 @@ fn callback_session_stores_correct_user() {
 /// must redirect to `/` without setting a session.
 #[test]
 fn callback_csrf_mismatch_redirects_to_root() {
-    let mut sim = turmoil::Builder::new().build();
-    register_app_server(&mut sim);
     // No GitHub mock needed — the handler bails out before hitting GitHub.
-
     let cookie = state_cookie("correct-state");
-    let path = "/auth/callback?code=x&state=wrong-state";
 
-    sim.client("client", async move {
-        let (status, headers, _body) = request_with_cookie(path, Some(&cookie)).await;
+    run_sim(|| async move {
+        let (status, headers, _body) =
+            request_with_cookie("/auth/callback?code=x&state=wrong-state", Some(&cookie)).await;
 
         assert!(status.is_redirection(), "expected redirect, got {status}");
         let location = headers
@@ -183,18 +156,13 @@ fn callback_csrf_mismatch_redirects_to_root() {
 
         Ok(())
     });
-
-    sim.run().unwrap();
 }
 
 /// When the OAuth state cookie is absent entirely, the handler must redirect
 /// to `/` (treated as a CSRF failure).
 #[test]
 fn callback_missing_state_cookie_redirects_to_root() {
-    let mut sim = turmoil::Builder::new().build();
-    register_app_server(&mut sim);
-
-    sim.client("client", async {
+    run_sim(|| async {
         let (status, headers, _body) =
             request_with_cookie("/auth/callback?code=x&state=any", None).await;
 
@@ -207,6 +175,4 @@ fn callback_missing_state_cookie_redirects_to_root() {
 
         Ok(())
     });
-
-    sim.run().unwrap();
 }

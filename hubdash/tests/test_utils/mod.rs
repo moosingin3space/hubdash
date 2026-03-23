@@ -5,6 +5,7 @@ pub mod connector;
 pub mod mock_github;
 pub mod platform;
 
+use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use http_body_util::{BodyExt, Full};
@@ -41,8 +42,9 @@ pub fn test_oauth_config() -> GitHubOAuthConfig {
     }
 }
 
-/// Registers the hubdash app server host in a turmoil simulation.
-pub fn register_app_server(sim: &mut turmoil::Sim<'_>) {
+// ── server registration helpers ──────────────────────────────────────────────
+
+fn register_app_server(sim: &mut turmoil::Sim<'_>) {
     sim.host(APP_HOST, || async {
         let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
             .await
@@ -53,23 +55,7 @@ pub fn register_app_server(sim: &mut turmoil::Sim<'_>) {
     });
 }
 
-/// Registers a hubdash app server with a pre-built OAuth config.
-pub fn register_app_server_with_config(sim: &mut turmoil::Sim<'_>, oauth: GitHubOAuthConfig) {
-    sim.host(APP_HOST, move || {
-        let oauth = oauth.clone();
-        async move {
-            let listener = sim_listen(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), APP_PORT))
-                .await
-                .unwrap();
-            let router = create_router(SimPlatform, oauth);
-            axum::serve(listener, router).await.unwrap();
-            Ok(())
-        }
-    });
-}
-
-/// Registers the mock `github.com` host (OAuth token endpoint).
-pub fn register_github_server(sim: &mut turmoil::Sim<'_>) {
+fn register_github_server(sim: &mut turmoil::Sim<'_>) {
     sim.host(GITHUB_HOST, || async {
         let listener = sim_listen(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -82,8 +68,7 @@ pub fn register_github_server(sim: &mut turmoil::Sim<'_>) {
     });
 }
 
-/// Registers the mock `api.github.com` host (user info endpoint).
-pub fn register_api_github_server(sim: &mut turmoil::Sim<'_>) {
+fn register_api_github_server(sim: &mut turmoil::Sim<'_>) {
     sim.host(API_GITHUB_HOST, || async {
         let listener = sim_listen(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -97,6 +82,39 @@ pub fn register_api_github_server(sim: &mut turmoil::Sim<'_>) {
         Ok(())
     });
 }
+
+// ── simulation runners ───────────────────────────────────────────────────────
+
+/// Runs a turmoil simulation with the hubdash app server, then calls
+/// `client_fn` in the simulated client host.
+pub fn run_sim<F, Fut>(client_fn: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
+{
+    let mut sim = turmoil::Builder::new().build();
+    register_app_server(&mut sim);
+    sim.client("client", client_fn());
+    sim.run().unwrap();
+}
+
+/// Runs a turmoil simulation with the hubdash app server and both GitHub mock
+/// servers (`github.com` for token exchange, `api.github.com` for user info),
+/// then calls `client_fn` in the simulated client host.
+pub fn run_github_sim<F, Fut>(client_fn: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
+{
+    let mut sim = turmoil::Builder::new().build();
+    register_app_server(&mut sim);
+    register_github_server(&mut sim);
+    register_api_github_server(&mut sim);
+    sim.client("client", client_fn());
+    sim.run().unwrap();
+}
+
+// ── HTTP helpers ─────────────────────────────────────────────────────────────
 
 /// Sends a GET request to the hubdash app and returns `(status, body_string)`.
 pub async fn get(path: &str) -> (http::StatusCode, String) {
