@@ -1,12 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver", "github>moosingin3space/renovate-util:rust-toolchain"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver", "github>moosingin3space/renovate-util:rust-toolchain", "github>moosingin3space/renovate-util:miniflareAutomerge"],
   "ignorePaths": [".dagger/**"],
   "customManagers": [
     {
       "customType": "jsonata",
       "fileFormat": "yaml",
-      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/"],
+      "managerFilePatterns": ["/^\.github/workflows/.*\.ya?ml$/"],
       "matchStrings": [
         "$each(jobs, function($j) { $j.*.steps[uses = \"dagger/dagger-for-github\"].({ \"depName\": \"dagger/dagger\", \"currentValue\": $j.*.steps[uses = \"dagger/dagger-for-github\"].with.version }) })"
       ],
