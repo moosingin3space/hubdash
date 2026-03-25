@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver", "github>moosingin3space/renovate-util:rust-toolchain", "github>moosingin3space/renovate-util:miniflareAutomerge"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver", "github>moosingin3space/renovate-util:rust-toolchain", "github>moosingin3space/renovate-util:miniflareAutomerge", "github>moosingin3space/renovate-util:wranglerAutomerge"],
   "ignorePaths": [".dagger/**"],
   "customManagers": [
     {
