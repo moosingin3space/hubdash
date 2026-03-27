@@ -6,9 +6,14 @@
   },
   "dependencies": [
     {
+      "name": "charmd-cf-worker",
+      "source": "github.com/moosingin3space/daggerverse/modules/charmd-cf-worker@main",
+      "pin": "36b9c15d8028ab5db4cc9b8d093828d473b8ec35"
+    },
+    {
       "name": "rust",
       "source": "github.com/moosingin3space/daggerverse/modules/rust@main",
-      "pin": "0a35f1602c08c057959d0ba64d179282918abcd1"
+      "pin": "36b9c15d8028ab5db4cc9b8d093828d473b8ec35"
     },
     {
       "name": "wolfi",
