@@ -1,7 +1,9 @@
-// Dagger module for Hubdash CI/CD pipelines
+// Dagger module for Hubdash CI/CD pipelines.
 //
-// This module provides linting, testing, building, and deployment functions
-// for the hubdash project, including the Cloudflare Worker in hubdash-cf/.
+// Lint, test, and deployment logic is delegated to shared CHARMD modules
+// (rust and cf-worker) from the daggerverse. This module provides thin
+// wrappers that supply hubdash-specific parameters (worker directory,
+// toolchain file, cache volume names, etc.).
 package main
 
 import (
@@ -13,7 +15,7 @@ const pnpmStoreCacheName = "hubdash-pnpm-store"
 
 type Hubdash struct{}
 
-// Runs cargo fmt check, cargo check, and cargo clippy with warnings denied.
+// Lint runs cargo fmt check, cargo check, and cargo clippy.
 // Source directory defaults to the root of the repository.
 func (m *Hubdash) Lint(
 	ctx context.Context,
@@ -40,66 +42,37 @@ func (m *Hubdash) Lint(
 	return checkOut + fmtOut + clippyOut, nil
 }
 
-// Runs cargo test.
+// Test runs the Rust test suite via cargo test.
 // Source directory defaults to the root of the repository.
 func (m *Hubdash) Test(
 	ctx context.Context,
 	//+defaultPath="/"
 	source *dagger.Directory,
 ) (string, error) {
-	rust := dag.Rust().DevContainer(dagger.RustDevContainerOpts{
+	return dag.Rust().DevContainer(dagger.RustDevContainerOpts{
 		ToolchainFile: source.File("rust-toolchain.toml"),
 		Source:        source,
-	})
-
-	return rust.Container().
-		WithExec([]string{"cargo", "test"}).
-		Stdout(ctx)
+	}).CargoTest(ctx)
 }
 
-// cfWorkerContainer extends the Rust dev container with CF worker build tools.
-// Source is mounted at /src by the Rust DevContainer.
-func (m *Hubdash) cfWorkerContainer(source *dagger.Directory) *dagger.Container {
-	return dag.Rust().DevContainer(dagger.RustDevContainerOpts{
-		ToolchainFile:     source.File("rust-toolchain.toml"),
-		Source:            source,
-		ExtraPackages:     []string{"nodejs-22", "npm", "clang", "wasm-tools", "worker-build"},
-		ExtraRepositories: []string{"https://moosingin3space.github.io/wolfi-pkgs"},
-		ExtraKeyUrls:      []string{"https://moosingin3space.github.io/wolfi-pkgs/melange.rsa.pub"},
-	}).Container().
-		WithExec([]string{"npm", "install", "-g", "pnpm@10.30.3"}).
-		WithWorkdir("/src/hubdash-cf").
-		WithMountedCache("/root/.local/share/pnpm/store", dag.CacheVolume(pnpmStoreCacheName)).
-		WithEnvVariable("CI", "true").
-		WithExec([]string{"pnpm", "install", "--frozen-lockfile"})
-}
-
-// CfWorkerBuild builds the Cloudflare Worker without deploying.
-// Source directory defaults to the root of the repository.
-func (m *Hubdash) CfWorkerBuild(
-	ctx context.Context,
-	//+defaultPath="/"
-	source *dagger.Directory,
-) (string, error) {
-	return m.cfWorkerContainer(source).
-		WithExec([]string{"worker-build", "--release"}).
-		Stdout(ctx)
-}
-
-// CfWorkerTest runs tests for the Cloudflare Worker.
+// CfWorkerTest builds and tests the hubdash-cf Cloudflare Worker.
 // Source directory defaults to the root of the repository.
 func (m *Hubdash) CfWorkerTest(
 	ctx context.Context,
 	//+defaultPath="/"
 	source *dagger.Directory,
 ) (string, error) {
-	return m.cfWorkerContainer(source).
-		WithExec([]string{"pnpm", "wrangler", "deploy", "--dry-run"}).
-		WithExec([]string{"pnpm", "test"}).
-		Stdout(ctx)
+	return dag.CharmdCfWorker().DevContainer(
+		"hubdash-cf",
+		dagger.CharmdCfWorkerDevContainerOpts{
+			Source:          source,
+			ToolchainFile:   source.File("rust-toolchain.toml"),
+			PnpmCacheVolume: pnpmStoreCacheName,
+		},
+	).Test(ctx)
 }
 
-// DeployCfWorker deploys the Cloudflare Worker using Wrangler.
+// DeployCfWorker deploys the hubdash-cf Cloudflare Worker using Wrangler.
 // Source directory defaults to the root of the repository.
 func (m *Hubdash) DeployCfWorker(
 	ctx context.Context,
@@ -110,9 +83,12 @@ func (m *Hubdash) DeployCfWorker(
 	// Cloudflare Account ID
 	cloudflareAccountId *dagger.Secret,
 ) (string, error) {
-	return m.cfWorkerContainer(source).
-		WithSecretVariable("CLOUDFLARE_API_TOKEN", cloudflareApiToken).
-		WithSecretVariable("CLOUDFLARE_ACCOUNT_ID", cloudflareAccountId).
-		WithExec([]string{"pnpm", "run", "deploy"}).
-		Stdout(ctx)
+	return dag.CharmdCfWorker().DevContainer(
+		"hubdash-cf",
+		dagger.CharmdCfWorkerDevContainerOpts{
+			Source:          source,
+			ToolchainFile:   source.File("rust-toolchain.toml"),
+			PnpmCacheVolume: pnpmStoreCacheName,
+		},
+	).Deploy(ctx, cloudflareApiToken, cloudflareAccountId)
 }
