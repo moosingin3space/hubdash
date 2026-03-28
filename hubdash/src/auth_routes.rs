@@ -42,6 +42,12 @@ async fn signin<P: Platform>(
         .max_age(time::Duration::minutes(10))
         .build();
 
+    let redirect_uri = state
+        .plat
+        .redirect_base_url()
+        .join("/auth/callback")
+        .expect("valid path join");
+
     let mut authorize_url = state
         .oauth
         .github_base_url
@@ -50,6 +56,7 @@ async fn signin<P: Platform>(
     authorize_url
         .query_pairs_mut()
         .append_pair("client_id", &state.oauth.client_id)
+        .append_pair("redirect_uri", redirect_uri.as_str())
         .append_pair("state", &oauth_state);
 
     (jar.add(state_cookie), Redirect::to(authorize_url.as_str()))

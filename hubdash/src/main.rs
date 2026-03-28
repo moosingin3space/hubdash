@@ -22,6 +22,10 @@ struct Args {
     /// GitHub App client secret
     #[arg(long, env = "GITHUB_CLIENT_SECRET")]
     github_client_secret: String,
+
+    /// Base URL of this deployment, used to build the OAuth redirect URI
+    #[arg(long, env = "BASE_URL", default_value = "http://localhost:3000")]
+    base_url: url::Url,
 }
 
 #[cfg(not(feature = "tokio"))]
@@ -40,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(EnvFilter::new(&args.log_level))
         .init();
 
-    let platform = hubdash::TokioPlatform;
+    let platform = hubdash::TokioPlatform::new(args.base_url);
     let oauth = hubdash::GitHubOAuthConfig {
         client_id: args.github_client_id,
         client_secret: args.github_client_secret,

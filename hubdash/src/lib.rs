@@ -114,4 +114,9 @@ pub trait Platform: Clone + Send + Sync + 'static {
 
     /// Creates a new session store for this platform.
     fn create_session_store(&self) -> Self::SessionStore;
+
+    /// Returns the base URL of this deployment (e.g. `https://hubdash.example.com`).
+    ///
+    /// Used to build the OAuth `redirect_uri` sent to GitHub during sign-in.
+    fn redirect_base_url(&self) -> url::Url;
 }
