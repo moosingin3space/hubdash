@@ -1,0 +1,23 @@
+name: CF Worker Preview Deploy
+
+on:
+    pull_request_target: # zizmor: ignore[dangerous-triggers]
+        types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+    deploy-preview:
+        if: |
+            github.event.pull_request.author_association == 'COLLABORATOR' ||
+            github.event.pull_request.author_association == 'MEMBER' ||
+            github.event.pull_request.author_association == 'OWNER'
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@bef8189fc03988d92acfd55d338e2dc5a66f9ab8 # v1.2.1
+        with:
+            dagger-version: v0.20.3
+            environment: preview
+            call: deploy-cf-worker --pr-number=${{ github.event.pull_request.number }} --cloudflare-api-token=env:CLOUDFLARE_API_TOKEN --cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID
+        secrets:
+            dagger-cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+            cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+            cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

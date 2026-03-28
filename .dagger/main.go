@@ -73,6 +73,9 @@ func (m *Hubdash) CfWorkerTest(
 }
 
 // DeployCfWorker deploys the hubdash-cf Cloudflare Worker using Wrangler.
+// For production, omit prNumber.
+// For preview, pass prNumber to upload a new version with alias "pr-<prNumber>",
+// yielding a preview URL of the form pr-<N>-hubdash.<subdomain>.workers.dev.
 // Source directory defaults to the root of the repository.
 func (m *Hubdash) DeployCfWorker(
 	ctx context.Context,
@@ -82,13 +85,21 @@ func (m *Hubdash) DeployCfWorker(
 	cloudflareApiToken *dagger.Secret,
 	// Cloudflare Account ID
 	cloudflareAccountId *dagger.Secret,
+	// Pull request number. When set, uploads a versioned preview alias "pr-<prNumber>".
+	//+optional
+	prNumber string,
 ) (string, error) {
-	return dag.CharmdCfWorker().DevContainer(
+	ctr := dag.CharmdCfWorker().DevContainer(
 		"hubdash-cf",
 		dagger.CharmdCfWorkerDevContainerOpts{
 			Source:          source,
 			ToolchainFile:   source.File("rust-toolchain.toml"),
 			PnpmCacheVolume: pnpmStoreCacheName,
 		},
-	).Deploy(ctx, cloudflareApiToken, cloudflareAccountId)
+	)
+	if prNumber != "" {
+		return ctr.UploadVersion(ctx, cloudflareApiToken, cloudflareAccountId,
+			dagger.CharmdCfWorkerUploadVersionOpts{PreviewAlias: "pr-" + prNumber})
+	}
+	return ctr.Deploy(ctx, cloudflareApiToken, cloudflareAccountId)
 }
