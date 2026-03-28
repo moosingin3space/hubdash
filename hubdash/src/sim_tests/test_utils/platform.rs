@@ -13,8 +13,10 @@ use http_body_util::{BodyExt, Full};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use thiserror::Error;
+use url::Url;
 
 use super::connector::SimConnector;
+use super::{APP_HOST, APP_PORT};
 
 /// Error type for the simulated HTTP client.
 #[derive(Debug, Error)]
@@ -81,6 +83,10 @@ pub struct SimPlatform;
 impl Platform for SimPlatform {
     type HttpClient = SimHttpClient;
     type SessionStore = InMemorySessionStore;
+
+    fn redirect_base_url(&self) -> Url {
+        Url::parse(&format!("http://{}:{}", APP_HOST, APP_PORT)).expect("valid sim base URL")
+    }
 
     fn create_http_client(&self) -> Self::HttpClient {
         SimHttpClient::new()

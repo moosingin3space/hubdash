@@ -30,10 +30,21 @@ use http_body::Body;
 use hyper_rustls::HttpsConnectorBuilder;
 use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use thiserror::Error;
+use url::Url;
 
 /// A Tokio-based platform for running HubDash.
-#[derive(Clone, Copy)]
-pub struct TokioPlatform;
+#[derive(Clone)]
+pub struct TokioPlatform {
+    /// The base URL of this deployment, used to build the OAuth `redirect_uri`.
+    base_url: Url,
+}
+
+impl TokioPlatform {
+    /// Creates a new `TokioPlatform` with the given base URL.
+    pub fn new(base_url: Url) -> Self {
+        Self { base_url }
+    }
+}
 
 /// Internal body type used by the hyper client.
 type HyperBody = http_body_util::Full<bytes::Bytes>;
@@ -114,6 +125,10 @@ impl SessionStore for InMemorySessionStore {
 impl Platform for TokioPlatform {
     type HttpClient = HyperUtilHttpClient;
     type SessionStore = InMemorySessionStore;
+
+    fn redirect_base_url(&self) -> Url {
+        self.base_url.clone()
+    }
 
     fn create_http_client(&self) -> Self::HttpClient {
         let https = HttpsConnectorBuilder::new()

@@ -878,6 +878,7 @@ dependencies = [
  "http-body-util",
  "hubdash",
  "tower-service",
+ "url",
  "uuid",
  "worker",
 ]

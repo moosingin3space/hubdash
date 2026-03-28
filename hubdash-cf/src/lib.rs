@@ -10,8 +10,10 @@ use worker::*;
 use hubdash::session::{Session, SessionId, SessionStore, SessionStoreError};
 use hubdash::{GitHubOAuthConfig, HttpClient, Platform};
 
-#[derive(Clone, Copy)]
-struct CloudflarePlatform;
+#[derive(Clone)]
+struct CloudflarePlatform {
+    base_url: url::Url,
+}
 
 #[derive(Clone, Copy)]
 struct CloudflareHttpClient;
@@ -83,12 +85,29 @@ impl Platform for CloudflarePlatform {
     type HttpClient = CloudflareHttpClient;
     type SessionStore = CloudflareSessionStore;
 
+    fn redirect_base_url(&self) -> url::Url {
+        self.base_url.clone()
+    }
+
     fn create_http_client(&self) -> Self::HttpClient {
         CloudflareHttpClient
     }
 
     fn create_session_store(&self) -> Self::SessionStore {
         CloudflareSessionStore::new()
+    }
+}
+
+/// Derives the base URL (scheme + host, no path) from an incoming HTTP request.
+fn base_url_from_request(req: &HttpRequest) -> url::Url {
+    let uri = req.uri();
+    let scheme = uri.scheme_str().unwrap_or("https");
+    let host = uri.host().unwrap_or("localhost");
+    match uri.port_u16() {
+        Some(port) => {
+            url::Url::parse(&format!("{scheme}://{host}:{port}")).expect("derived URL is valid")
+        }
+        None => url::Url::parse(&format!("{scheme}://{host}")).expect("derived URL is valid"),
     }
 }
 
@@ -101,13 +120,14 @@ async fn fetch(
     console_error_panic_hook::set_once();
     let _ = ctx;
 
+    let base_url = base_url_from_request(&req);
     let oauth = GitHubOAuthConfig {
         client_id: env.var("GITHUB_CLIENT_ID")?.to_string(),
         client_secret: env.var("GITHUB_CLIENT_SECRET")?.to_string(),
         ..Default::default()
     };
 
-    let mut router = hubdash::create_router(CloudflarePlatform, oauth);
+    let mut router = hubdash::create_router(CloudflarePlatform { base_url }, oauth);
 
     Ok(router.call(req).await?)
 }
