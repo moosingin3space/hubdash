@@ -73,12 +73,24 @@ fn build_router<P: Platform>(state: AppState<P>) -> Router {
             auth_middleware::require_auth::<P>,
         ));
 
-    Router::new()
+    let router = Router::new()
         .route("/", get(landing::landing_page))
         .nest("/dashboard", dashboard_routes)
         .nest("/auth", auth_routes::router::<P>())
         .with_state(state)
-        .nest("/assets", assets::router())
+        .nest("/assets", assets::router());
+
+    #[cfg(debug_assertions)]
+    let router = with_livereload(router);
+
+    router
+}
+
+#[cfg(debug_assertions)]
+fn with_livereload(router: Router) -> Router {
+    router.layer(tower_livereload::LiveReloadLayer::new().request_predicate(
+        |req: &http::Request<axum::body::Body>| !req.headers().contains_key("hx-request"),
+    ))
 }
 
 /// Represents an HTTP Client interface.
