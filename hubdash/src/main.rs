@@ -51,6 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
     let router = hubdash::create_router(platform, oauth);
-    let listener = tokio::net::TcpListener::bind(args.bind_address).await?;
+    let listener =
+        if let Some(std_listener) = listenfd::ListenFd::from_env().take_tcp_listener(0)? {
+            // Ensure it's non-blocking before passing to Tokio.
+            std_listener.set_nonblocking(true)?;
+            tokio::net::TcpListener::from_std(std_listener)?
+        } else {
+            tokio::net::TcpListener::bind(args.bind_address).await?
+        };
     Ok(axum::serve(listener, router.into_make_service()).await?)
 }
