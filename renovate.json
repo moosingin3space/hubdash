@@ -19,6 +19,40 @@
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "jsonata",
+      "fileFormat": "yaml",
+      "managerFilePatterns": ["/^\\..github/workflows/.*\\.ya?ml$/"],
+      "matchStrings": [
+        "$each(jobs, function($j) { $exists($j.with[\"dagger-version\"]) ? { \"depName\": \"dagger/dagger\", \"currentValue\": $j.with[\"dagger-version\"] } })"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "jsonata",
+      "fileFormat": "json",
+      "managerFilePatterns": ["/^dagger\\.json$/"],
+      "matchStrings": ["{ \"currentValue\": engineVersion }"],
+      "depNameTemplate": "dagger/dagger",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "jsonata",
+      "fileFormat": "json",
+      "managerFilePatterns": ["/^dagger\\.json$/"],
+      "matchStrings": [
+        "$map(dependencies, function($d) { $match($d.source, /^github\\.com\\/([^\\/]+\\/[^\\/]+)[^@]*@(.+)$/) ~> function($m) { { \"depName\": $d.name, \"packageName\": $m.groups[0], \"currentValue\": $m.groups[1], \"currentDigest\": $d.pin } } })"
+      ],
+      "datasourceTemplate": "github-tags"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["dagger/dagger"],
+      "groupName": "dagger"
     }
   ]
 }
