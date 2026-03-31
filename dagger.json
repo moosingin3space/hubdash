@@ -8,7 +8,7 @@
     {
       "name": "charmd-cf-worker",
       "source": "github.com/moosingin3space/daggerverse/modules/charmd-cf-worker@main",
-      "pin": "36b9c15d8028ab5db4cc9b8d093828d473b8ec35"
+      "pin": "e6402c81ade36c3955c378539d4c648731cce99b"
     },
     {
       "name": "rust",
