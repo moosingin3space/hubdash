@@ -1,58 +1,12 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigestsToSemver",
-    "github>moosingin3space/renovate-util:rust-toolchain",
-    "github>moosingin3space/renovate-util:rustToolchainAutomerge",
-    "github>moosingin3space/renovate-util:miniflareAutomerge",
-    "github>moosingin3space/renovate-util:wranglerAutomerge"
-  ],
-  "ignorePaths": [".dagger/**"],
-  "customManagers": [
-    {
-      "customType": "jsonata",
-      "fileFormat": "yaml",
-      "managerFilePatterns": ["/^\\..github/workflows/.*\\.ya?ml$/"],
-      "matchStrings": [
-        "$each(jobs, function($j) { $j.*.steps[uses = \"dagger/dagger-for-github\"].({ \"depName\": \"dagger/dagger\", \"currentValue\": $j.*.steps[uses = \"dagger/dagger-for-github\"].with.version }) })"
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "jsonata",
-      "fileFormat": "yaml",
-      "managerFilePatterns": ["/^\\..github/workflows/.*\\.ya?ml$/"],
-      "matchStrings": [
-        "$each(jobs, function($j) { $exists($j.with[\"dagger-version\"]) ? { \"depName\": \"dagger/dagger\", \"currentValue\": $j.with[\"dagger-version\"] } })"
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "jsonata",
-      "fileFormat": "json",
-      "managerFilePatterns": ["/^dagger\\.json$/"],
-      "matchStrings": ["{ \"currentValue\": engineVersion }"],
-      "depNameTemplate": "dagger/dagger",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "jsonata",
-      "fileFormat": "json",
-      "managerFilePatterns": ["/^dagger\\.json$/"],
-      "matchStrings": [
-        "$map(dependencies, function($d) { $match($d.source, /^github\\.com\\/([^\\/]+\\/[^\\/]+)[^@]*@(.+)$/) ~> function($m) { { \"depName\": $d.name, \"packageName\": $m.groups[0], \"currentValue\": $m.groups[1], \"currentDigest\": $d.pin } } })"
-      ],
-      "datasourceTemplate": "github-tags"
-    }
-  ],
-  "packageRules": [
-    {
-      "matchPackageNames": ["dagger/dagger"],
-      "groupName": "dagger"
-    }
-  ]
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        "helpers:pinGitHubActionDigestsToSemver",
+        "github>moosingin3space/renovate-util:rust-toolchain",
+        "github>moosingin3space/renovate-util:rustToolchainAutomerge",
+        "github>moosingin3space/renovate-util:miniflareAutomerge",
+        "github>moosingin3space/renovate-util:wranglerAutomerge",
+        "github>moosingin3space/renovate-util:dagger"
+    ]
 }

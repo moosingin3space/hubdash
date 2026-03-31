@@ -12,9 +12,8 @@ jobs:
             github.event.pull_request.author_association == 'COLLABORATOR' ||
             github.event.pull_request.author_association == 'MEMBER' ||
             github.event.pull_request.author_association == 'OWNER'
-        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@bef8189fc03988d92acfd55d338e2dc5a66f9ab8 # v1.2.1
+        uses: moosingin3space/charmd-stack-ci/.github/workflows/dagger-call.yml@0e0160e31e429cd20cdbeb6bc588cb7ca018ea83 # v1.3.0
         with:
-            dagger-version: v0.20.3
             environment: preview
             call: deploy-cf-worker --pr-number=${{ github.event.pull_request.number }} --cloudflare-api-token=env:CLOUDFLARE_API_TOKEN --cloudflare-account-id=env:CLOUDFLARE_ACCOUNT_ID
         secrets:
