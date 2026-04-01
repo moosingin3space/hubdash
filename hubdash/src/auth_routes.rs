@@ -107,7 +107,7 @@ where
     };
     let session_id_value = session.id.as_str().to_owned();
 
-    if let Err(e) = state.sessions.put(session) {
+    if let Err(e) = state.sessions.put(session).await {
         error!("Failed to store session: {e}");
         return (jar, Redirect::to("/")).into_response();
     }
@@ -136,7 +136,7 @@ async fn signout<P: Platform>(
 ) -> impl IntoResponse {
     if let Some(cookie) = jar.get(SESSION_COOKIE) {
         let id = SessionId::from(cookie.value().to_owned());
-        let _ = state.sessions.delete(&id);
+        let _ = state.sessions.delete(&id).await;
     }
 
     let remove_cookie = Cookie::build(SESSION_COOKIE)

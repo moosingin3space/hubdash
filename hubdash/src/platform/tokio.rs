@@ -95,7 +95,7 @@ impl Default for InMemorySessionStore {
 }
 
 impl SessionStore for InMemorySessionStore {
-    fn put(&self, session: Session) -> Result<(), SessionStoreError> {
+    async fn put(&self, session: Session) -> Result<(), SessionStoreError> {
         let mut store = self
             .sessions
             .lock()
@@ -104,7 +104,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(())
     }
 
-    fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError> {
+    async fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError> {
         let store = self
             .sessions
             .lock()
@@ -112,7 +112,7 @@ impl SessionStore for InMemorySessionStore {
         Ok(store.get(id).cloned())
     }
 
-    fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError> {
+    async fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError> {
         let mut store = self
             .sessions
             .lock()

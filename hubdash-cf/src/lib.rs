@@ -3,11 +3,11 @@
 use tracing_subscriber::prelude::*;
 use tracing_web::MakeConsoleWriter;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use http_body_util::BodyExt;
 use tower_service::Service;
+use wasm_bindgen::JsValue;
 use worker::*;
 
 use hubdash::session::{Session, SessionId, SessionStore, SessionStoreError};
@@ -16,6 +16,7 @@ use hubdash::{GitHubOAuthConfig, HttpClient, Platform};
 #[derive(Clone)]
 struct CloudflarePlatform {
     base_url: url::Url,
+    db: Arc<worker::d1::D1Database>,
 }
 
 #[derive(Clone, Copy)]
@@ -49,37 +50,72 @@ impl HttpClient for CloudflareHttpClient {
 }
 
 #[derive(Clone)]
-struct CloudflareSessionStore(Arc<Mutex<HashMap<SessionId, Session>>>);
+struct CloudflareSessionStore(Arc<worker::d1::D1Database>);
 
-impl CloudflareSessionStore {
-    fn new() -> Self {
-        Self(Arc::new(Mutex::new(HashMap::new())))
-    }
+/// A row returned from the sessions table.
+#[derive(serde::Deserialize)]
+struct SessionRow {
+    data: String,
 }
 
 impl SessionStore for CloudflareSessionStore {
-    fn put(&self, session: Session) -> Result<(), SessionStoreError> {
-        self.0
-            .lock()
-            .map_err(|e| SessionStoreError::Internal(e.to_string()))?
-            .insert(session.id.clone(), session);
+    #[worker::send]
+    async fn put(&self, session: Session) -> Result<(), SessionStoreError> {
+        let data = serde_json::to_string(&session)
+            .map_err(|e| SessionStoreError::Internal(e.to_string()))?;
+        let expires_at = js_sys::Date::now() as u64 / 1000 + 604_800; // 7 days, matching cookie max_age
+        let stmt = self
+            .0
+            .prepare(
+                "INSERT OR REPLACE INTO sessions (id, data, expires_at) VALUES (?1, json(?2), ?3)",
+            )
+            .bind(&[
+                JsValue::from_str(session.id.as_str()),
+                JsValue::from_str(&data),
+                JsValue::from_f64(expires_at as f64),
+            ])
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
+        stmt.run()
+            .await
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
         Ok(())
     }
 
-    fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError> {
-        Ok(self
+    #[worker::send]
+    async fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError> {
+        let now = js_sys::Date::now() as u64 / 1000;
+        let stmt = self
             .0
-            .lock()
-            .map_err(|e| SessionStoreError::Internal(e.to_string()))?
-            .get(id)
-            .cloned())
+            .prepare("SELECT json(data) AS data FROM sessions WHERE id = ?1 AND expires_at > ?2")
+            .bind(&[
+                JsValue::from_str(id.as_str()),
+                JsValue::from_f64(now as f64),
+            ])
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
+        let row = stmt
+            .first::<SessionRow>(None)
+            .await
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
+        match row {
+            None => Ok(None),
+            Some(r) => {
+                let session: Session = serde_json::from_str(&r.data)
+                    .map_err(|e| SessionStoreError::Internal(e.to_string()))?;
+                Ok(Some(session))
+            }
+        }
     }
 
-    fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError> {
-        self.0
-            .lock()
-            .map_err(|e| SessionStoreError::Internal(e.to_string()))?
-            .remove(id);
+    #[worker::send]
+    async fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError> {
+        let stmt = self
+            .0
+            .prepare("DELETE FROM sessions WHERE id = ?1")
+            .bind(&[JsValue::from_str(id.as_str())])
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
+        stmt.run()
+            .await
+            .map_err(|e: worker::Error| SessionStoreError::Internal(e.to_string()))?;
         Ok(())
     }
 }
@@ -97,7 +133,7 @@ impl Platform for CloudflarePlatform {
     }
 
     fn create_session_store(&self) -> Self::SessionStore {
-        CloudflareSessionStore::new()
+        CloudflareSessionStore(Arc::clone(&self.db))
     }
 }
 
@@ -140,8 +176,28 @@ async fn fetch(
         client_secret: env.var("GITHUB_CLIENT_SECRET")?.to_string(),
         ..Default::default()
     };
+    let db = Arc::new(env.d1("DB")?);
 
-    let mut router = hubdash::create_router(CloudflarePlatform { base_url }, oauth);
+    let mut router = hubdash::create_router(CloudflarePlatform { base_url, db }, oauth);
 
     Ok(router.call(req).await?)
+}
+
+#[event(scheduled)]
+async fn scheduled(_event: ScheduledEvent, env: Env, _ctx: ScheduleContext) {
+    let Ok(db) = env.d1("DB") else {
+        tracing::error!("session cleanup: DB binding unavailable");
+        return;
+    };
+    let now = js_sys::Date::now() as u64 / 1000;
+    let result = db
+        .prepare("DELETE FROM sessions WHERE expires_at <= ?1")
+        .bind(&[JsValue::from_f64(now as f64)]);
+    let Ok(stmt) = result else {
+        tracing::error!("session cleanup: failed to bind statement");
+        return;
+    };
+    if let Err(e) = stmt.run().await {
+        tracing::error!("session cleanup failed: {e}");
+    }
 }

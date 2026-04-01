@@ -879,12 +879,16 @@ dependencies = [
  "http-body",
  "http-body-util",
  "hubdash",
+ "js-sys",
+ "serde",
+ "serde_json",
  "tower-service",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
  "url",
  "uuid",
+ "wasm-bindgen",
  "worker",
 ]
 

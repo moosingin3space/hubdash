@@ -21,6 +21,30 @@
   ],
   "preview_urls": true,
   /**
+   * D1 SQLite database for persistent session storage.
+   * Create namespaces with:
+   *   wrangler d1 create hubdash-sessions          → fill in database_id
+   *   wrangler d1 create hubdash-sessions-preview  → fill in preview_database_id
+   * Apply schema to each:
+   *   wrangler d1 execute hubdash-sessions         --file=migrations/0001_sessions.sql
+   *   wrangler d1 execute hubdash-sessions-preview --file=migrations/0001_sessions.sql
+   */
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hubdash-sessions",
+      "database_id": "93d70b75-6fb9-4bae-9177-098ec52a822a",
+      "preview_database_id": "244ee189-c334-4a98-8e65-79abe8f91ad7",
+    },
+  ],
+  /**
+   * Cron trigger for periodic cleanup of expired sessions.
+   * Runs hourly; correctness does not depend on it (expires_at is checked on every read).
+   */
+  "triggers": {
+    "crons": ["0 * * * *"],
+  },
+  /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
    */
