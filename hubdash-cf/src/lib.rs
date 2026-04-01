@@ -1,5 +1,8 @@
 //! HubDash as a Cloudflare Worker
 
+use tracing_subscriber::prelude::*;
+use tracing_web::MakeConsoleWriter;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -111,13 +114,24 @@ fn base_url_from_request(req: &HttpRequest) -> url::Url {
     }
 }
 
+#[event(start)]
+fn start() {
+    console_error_panic_hook::set_once();
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_ansi(false)
+        .without_time()
+        .with_writer(MakeConsoleWriter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
+}
+
 #[event(fetch)]
 async fn fetch(
     req: HttpRequest,
     env: Env,
     ctx: Context,
 ) -> Result<http::Response<hubdash::axum::body::Body>> {
-    console_error_panic_hook::set_once();
     let _ = ctx;
 
     let base_url = base_url_from_request(&req);
