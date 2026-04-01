@@ -73,6 +73,7 @@ fn register_app_server_with_session(sim: &mut turmoil::Sim<'_>, session_id: Sess
                     },
                     access_token: "fake-access-token".into(),
                 })
+                .await
                 .unwrap();
             let state = AppState::<SimPlatform> {
                 sessions,

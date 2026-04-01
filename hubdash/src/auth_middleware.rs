@@ -24,7 +24,10 @@ pub async fn require_auth<P: Platform>(
         .get(SESSION_COOKIE)
         .map(|c| SessionId::from(c.value().to_owned()));
 
-    let session = session_id.and_then(|id| state.sessions.get(&id).ok().flatten());
+    let session = match session_id {
+        Some(id) => state.sessions.get(&id).await.ok().flatten(),
+        None => None,
+    };
 
     match session {
         Some(session) => {

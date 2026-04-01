@@ -1,5 +1,7 @@
 //! Session management for authenticated users.
 
+use std::future::Future;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -51,7 +53,7 @@ pub struct GitHubUser {
 }
 
 /// An authenticated user session.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     /// The session ID.
     pub id: SessionId,
@@ -72,11 +74,14 @@ pub enum SessionStoreError {
 /// A session store for persisting user sessions.
 pub trait SessionStore: Clone + Send + Sync + 'static {
     /// Stores a session.
-    fn put(&self, session: Session) -> Result<(), SessionStoreError>;
+    fn put(&self, session: Session) -> impl Future<Output = Result<(), SessionStoreError>> + Send;
 
     /// Retrieves a session by its ID.
-    fn get(&self, id: &SessionId) -> Result<Option<Session>, SessionStoreError>;
+    fn get(
+        &self,
+        id: &SessionId,
+    ) -> impl Future<Output = Result<Option<Session>, SessionStoreError>> + Send;
 
     /// Deletes a session by its ID.
-    fn delete(&self, id: &SessionId) -> Result<(), SessionStoreError>;
+    fn delete(&self, id: &SessionId) -> impl Future<Output = Result<(), SessionStoreError>> + Send;
 }
