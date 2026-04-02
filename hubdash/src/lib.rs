@@ -80,7 +80,7 @@ fn build_router<P: Platform>(state: AppState<P>) -> Router {
         ));
 
     let router = Router::new()
-        .route("/", get(landing::landing_page))
+        .route("/", get(landing::landing_page::<P>))
         .nest("/dashboard", dashboard_routes)
         .nest("/auth", auth_routes::router::<P>())
         .with_state(state)

@@ -3,7 +3,7 @@
 //! Verifies that routes under `/dashboard` redirect unauthenticated requests
 //! to `/` and allow access when a valid session cookie is present.
 
-use super::test_utils::{get, run_sim};
+use super::test_utils::{get, get_with_cookie, run_authed_sim, run_sim};
 
 /// Dashboard root is behind auth; unauthenticated GET must redirect.
 #[test]
@@ -35,6 +35,16 @@ fn landing_page_is_public() {
             body.contains("Hubdash"),
             "landing page should contain 'Hubdash'"
         );
+        Ok(())
+    });
+}
+
+/// Root route redirects to `/dashboard` when a valid session cookie is present.
+#[test]
+fn root_redirects_to_dashboard_when_authenticated() {
+    run_authed_sim(|cookie| async move {
+        let (status, _body) = get_with_cookie("/", Some(&cookie)).await;
+        assert!(status.is_redirection(), "expected redirect, got {status}");
         Ok(())
     });
 }
