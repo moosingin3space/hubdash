@@ -45,7 +45,7 @@ cynic-codegen = "3"
 [dev-dependencies]
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
-rand = "0.8"
+rand = "0.10"
 turmoil = "0.7"
 tower = "0.5"
 hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] }
