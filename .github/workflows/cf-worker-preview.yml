@@ -4,7 +4,8 @@ on:
     pull_request_target: # zizmor: ignore[dangerous-triggers]
         types: [opened, synchronize, reopened]
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
     deploy-preview:
