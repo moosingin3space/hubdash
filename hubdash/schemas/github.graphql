@@ -7,6 +7,7 @@ schema {
 
 type Query {
   viewer: User!
+  repository(owner: String!, name: String!): Repository
 }
 
 type User {
@@ -54,6 +55,11 @@ type Repository {
   url: String!
   isFork: Boolean!
   defaultBranchRef: Ref
+  pullRequests(
+    first: Int!
+    states: [PullRequestState!]
+    orderBy: IssueOrder
+  ): PullRequestConnection!
 }
 
 type RepositoryOwner {
@@ -83,4 +89,32 @@ enum StatusState {
   FAILURE
   PENDING
   SUCCESS
+}
+
+type PullRequestConnection {
+  nodes: [PullRequest!]!
+}
+
+type PullRequest {
+  number: Int!
+  title: String!
+  url: String!
+  headRef: Ref
+}
+
+enum PullRequestState {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+input IssueOrder {
+  field: IssueOrderField!
+  direction: OrderDirection!
+}
+
+enum IssueOrderField {
+  CREATED_AT
+  UPDATED_AT
+  COMMENTS
 }

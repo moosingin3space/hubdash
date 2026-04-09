@@ -8,12 +8,13 @@ use tracing::error;
 use url::Url;
 
 use crate::github::oauth;
-use crate::github::{CheckStatus, Repository};
+use crate::github::{CheckStatus, RepoDetail, Repository};
 use crate::layout::base_layout;
 use crate::session::Session;
 use crate::{AppState, Platform};
 
-/// Status of a CI check run.
+// ── Check state display ───────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckState {
     Success,
@@ -22,7 +23,7 @@ pub enum CheckState {
 }
 
 impl CheckState {
-    pub fn css_class(self) -> &'static str {
+    fn css_class(self) -> &'static str {
         match self {
             Self::Success => "status-badge status-success",
             Self::Failure => "status-badge status-failure",
@@ -30,7 +31,7 @@ impl CheckState {
         }
     }
 
-    pub fn as_str(self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             Self::Success => "success",
             Self::Failure => "failure",
@@ -49,10 +50,15 @@ impl From<CheckStatus> for CheckState {
     }
 }
 
-/// Renders a status badge with appropriate styling.
 fn status_badge(state: CheckState) -> Markup {
     html! { span class=(state.css_class()) { (state.as_str()) } }
 }
+
+fn na_badge() -> Markup {
+    html! { span class="status-badge status-unknown" { "N/A" } }
+}
+
+// ── URL helpers ───────────────────────────────────────────────────────────────
 
 fn repo_expand_url(owner: &str, repo: &str) -> Url {
     let mut url = Url::parse("relative:/").expect("valid base");
@@ -66,40 +72,31 @@ fn repo_expand_url(owner: &str, repo: &str) -> Url {
     url
 }
 
-/// Generates the Alpine.js `x-data` attribute value for an expandable component.
+fn github_repo_url(owner: &str, repo: &str) -> Url {
+    let mut url = Url::parse("https://github.com").expect("valid base URL");
+    url.path_segments_mut()
+        .expect("cannot be base")
+        .push(owner)
+        .push(repo);
+    url
+}
+
 fn expandable_directive(url: &Url, element_id: &str) -> String {
     format!("expandable('{}', '{}')", url.path(), element_id)
 }
 
-/// Repository summary for display on the dashboard.
+// ── RepoSummary ───────────────────────────────────────────────────────────────
+
 pub struct RepoSummary {
     pub owner: String,
     pub repo: String,
-    pub description: String,
     pub main_status: CheckState,
 }
 
-impl RepoSummary {
-    fn full_name(&self) -> String {
-        format!("{}/{}", self.owner, self.repo)
-    }
-
-    fn github_url(&self) -> Url {
-        let mut url = Url::parse("https://github.com").expect("valid base URL");
-        url.path_segments_mut()
-            .expect("cannot be base")
-            .push(&self.owner)
-            .push(&self.repo);
-        url
-    }
-}
-
-/// Converts a GitHub API repository into a [`RepoSummary`].
 fn repo_summary_from(repo: &Repository) -> RepoSummary {
     RepoSummary {
         owner: repo.owner.login.clone(),
         repo: repo.name.clone(),
-        description: repo.description.clone().unwrap_or_default(),
         main_status: repo
             .main_check_status
             .map(CheckState::from)
@@ -107,29 +104,7 @@ fn repo_summary_from(repo: &Repository) -> RepoSummary {
     }
 }
 
-/// Returns the expanded detail HTML for a repository row.
-pub async fn repo_expand(Path((owner, repo)): Path<(String, String)>) -> impl IntoResponse {
-    let summary = RepoSummary {
-        owner: owner.clone(),
-        repo: repo.clone(),
-        description: String::new(),
-        main_status: CheckState::Pending,
-    };
-
-    let github_url = summary.github_url();
-    html! {
-        div class="repo-detail" {
-            div class="repo-info" {
-                a href=(github_url) target="_blank" class="repo-github-link" {
-                    (PreEscaped("🔗")) " " (github_url)
-                }
-                @if !summary.description.is_empty() {
-                    p class="repo-description" { (summary.description) }
-                }
-            }
-        }
-    }
-}
+// ── Rendering ─────────────────────────────────────────────────────────────────
 
 fn repo_table_header() -> Markup {
     html! {
@@ -156,7 +131,7 @@ fn repo_row(repo: &RepoSummary) -> Markup {
                 td class="expand-cell" {
                     span class="expand-arrow" { (PreEscaped("▶")) }
                 }
-                td class="repo-name" { (repo.full_name()) }
+                td class="repo-name" { (format!("{}/{}", repo.owner, repo.repo)) }
                 td class="main-status" { (status_badge(repo.main_status)) }
             }
             tr class="repo-detail-row" x-show="expanded" x-cloak {
@@ -195,10 +170,97 @@ fn repo_group(owner: &str, repos: &[RepoSummary], is_personal: bool) -> Markup {
     }
 }
 
+fn render_pr_table(prs: &[crate::github::PullRequest]) -> Markup {
+    if prs.is_empty() {
+        return html! { p class="no-prs" { "No open pull requests." } };
+    }
+    html! {
+        table class="pr-table" {
+            thead {
+                tr {
+                    th { "#" }
+                    th { "Title" }
+                    th { "Checks" }
+                }
+            }
+            tbody {
+                @for pr in prs {
+                    tr {
+                        td class="pr-number" {
+                            a href=(pr.url) target="_blank" { "#" (pr.number) }
+                        }
+                        td class="pr-title" { (pr.title) }
+                        td class="pr-status" {
+                            @match pr.check_status {
+                                Some(s) => (status_badge(CheckState::from(s))),
+                                None => (na_badge()),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn render_repo_detail(owner: &str, repo: &str, detail: &RepoDetail) -> Markup {
+    let github_url = github_repo_url(owner, repo);
+    html! {
+        div class="repo-detail" {
+            div class="repo-info" {
+                @if let Some(desc) = &detail.description {
+                    @if !desc.is_empty() {
+                        p class="repo-description" { (desc) }
+                    }
+                }
+                a href=(github_url) target="_blank" class="repo-github-link" {
+                    (PreEscaped("🔗")) " " (github_url)
+                }
+            }
+            div class="prs-section" {
+                h3 { "Open Pull Requests" }
+                (render_pr_table(&detail.pull_requests))
+            }
+        }
+    }
+}
+
+// ── Route handlers ────────────────────────────────────────────────────────────
+
+/// Returns the expanded detail HTML for a repository row (lazy-loaded via Alpine).
+pub async fn repo_expand<P: Platform>(
+    State(state): State<AppState<P>>,
+    Extension(session): Extension<Session>,
+    Path((owner, repo)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let http_client = state.plat.create_http_client();
+    let detail = match oauth::fetch_repo_detail(
+        &http_client,
+        &state.oauth.api_base_url,
+        &session.access_token,
+        &owner,
+        &repo,
+    )
+    .await
+    {
+        Ok(Some(d)) => d,
+        Ok(None) => RepoDetail {
+            description: None,
+            pull_requests: vec![],
+        },
+        Err(e) => {
+            error!("Failed to fetch detail for {owner}/{repo}: {e:?}");
+            RepoDetail {
+                description: None,
+                pull_requests: vec![],
+            }
+        }
+    };
+
+    render_repo_detail(&owner, &repo, &detail)
+}
+
 /// Renders the main dashboard page.
-///
-/// Fetches the repo list with check status via GraphQL; no further per-repo
-/// requests are needed.
 pub async fn dashboard_page<P: Platform>(
     State(state): State<AppState<P>>,
     Extension(session): Extension<Session>,

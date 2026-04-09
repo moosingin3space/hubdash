@@ -18,10 +18,11 @@ use crate::session::GitHubUser;
 use cynic::QueryBuilder;
 
 use super::graphql::{
-    GitObject, ListUserReposQuery, ListUserReposVariables, OrderDirection, RepositoryAffiliation,
+    GitObject, IssueOrder, IssueOrderField, ListUserReposQuery, ListUserReposVariables,
+    OrderDirection, PullRequestState, RepoDetailQuery, RepoDetailVariables, RepositoryAffiliation,
     RepositoryOrder, RepositoryOrderField, StatusState,
 };
-use super::types::{CheckStatus, Repository, RepositoryOwner};
+use super::types::{CheckStatus, PullRequest, RepoDetail, Repository, RepositoryOwner};
 
 /// Configuration for the GitHub OAuth flow.
 #[derive(Debug, Clone)]
@@ -297,9 +298,105 @@ where
                 owner: RepositoryOwner {
                     login: node.owner.login,
                 },
-                description: node.description,
                 main_check_status: Some(status),
             })
         })
         .collect())
+}
+
+fn check_status_from_ref(branch_ref: Option<&super::graphql::BranchRef>) -> Option<CheckStatus> {
+    branch_ref
+        .and_then(|r| r.target.as_ref())
+        .and_then(|t| match t {
+            GitObject::Commit(c) => c.status_check_rollup.as_ref(),
+            GitObject::Other => None,
+        })
+        .map(|rollup| status_state_to_check_status(rollup.state))
+}
+
+/// Fetches the description and open pull requests for a single repository.
+///
+/// Returns `Ok(None)` if GitHub reports the repository does not exist.
+pub async fn fetch_repo_detail<C>(
+    http_client: &C,
+    api_base_url: &Url,
+    access_token: &str,
+    owner: &str,
+    name: &str,
+) -> Result<Option<RepoDetail>, OAuthError<C::Error>>
+where
+    C: HttpClient,
+{
+    let operation = RepoDetailQuery::build(RepoDetailVariables {
+        owner: owner.to_string(),
+        name: name.to_string(),
+        pr_first: 10,
+        pr_states: Some(vec![PullRequestState::Open]),
+        pr_order_by: Some(IssueOrder {
+            field: IssueOrderField::UpdatedAt,
+            direction: OrderDirection::Desc,
+        }),
+    });
+
+    let graphql_url = api_base_url.join("/graphql").expect("valid path join");
+    let body = bytes::Bytes::from(
+        serde_json::to_vec(&operation).expect("cynic operation serialization cannot fail"),
+    );
+
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(graphql_url.as_str())
+        .header(ACCEPT, "application/vnd.github+json")
+        .header(AUTHORIZATION, format!("Bearer {access_token}"))
+        .header(USER_AGENT, "hubdash")
+        .header(CONTENT_TYPE, "application/json")
+        .body(Full::new(body))?;
+
+    let response = http_client.fetch(request).await.map_err(OAuthError::Http)?;
+    let status = response.status();
+    let body_bytes = response
+        .into_body()
+        .collect()
+        .await
+        .unwrap_or_default()
+        .to_bytes();
+
+    if !status.is_success() {
+        let body_str = String::from_utf8_lossy(&body_bytes).into_owned();
+        return Err(OAuthError::ApiError {
+            status,
+            body: body_str,
+        });
+    }
+
+    let gql: cynic::GraphQlResponse<RepoDetailQuery> =
+        serde_json::from_slice(&body_bytes).map_err(OAuthError::JsonParse)?;
+
+    if let Some(errors) = gql.errors {
+        let msg = errors
+            .into_iter()
+            .map(|e| e.message)
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(OAuthError::GraphQL(msg));
+    }
+
+    let data = gql
+        .data
+        .ok_or_else(|| OAuthError::GraphQL("response missing data field".into()))?;
+
+    Ok(data.repository.map(|repo| RepoDetail {
+        description: repo.description,
+        pull_requests: repo
+            .pull_requests
+            .nodes
+            .into_iter()
+            .map(|pr| PullRequest {
+                number: pr.number,
+                title: pr.title,
+                url: pr.url,
+                check_status: check_status_from_ref(pr.head_ref.as_ref()),
+            })
+            .collect(),
+    }))
 }

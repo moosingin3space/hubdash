@@ -22,6 +22,10 @@ fn repo_expand_returns_detail_html() {
             body.contains("repo-github-link"),
             "expected github link, got: {body}"
         );
+        assert!(
+            body.contains("prs-section"),
+            "expected PR section, got: {body}"
+        );
         Ok(())
     });
 }
