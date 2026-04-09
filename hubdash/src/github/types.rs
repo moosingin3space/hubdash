@@ -1,35 +1,41 @@
 //! Types for GitHub API responses.
 
-use serde::Deserialize;
-
 /// The aggregated CI check status for a repository's default branch HEAD.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckStatus {
-    /// All checks passed.
     Success,
-    /// At least one check failed or errored.
     Failure,
-    /// Checks are queued or in progress.
     Pending,
 }
 
 /// Owner of a GitHub repository.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct RepositoryOwner {
-    /// The login name of the owner.
     pub login: String,
 }
 
-/// A GitHub repository.
+/// A GitHub repository with its default-branch check status.
 #[derive(Debug, Clone)]
 pub struct Repository {
-    /// The short name of the repository (e.g. "hubdash").
     pub name: String,
-    /// The owner of the repository.
     pub owner: RepositoryOwner,
-    /// The repository description.
-    pub description: Option<String>,
     /// Aggregated check status of the HEAD commit on the default branch,
     /// or `None` if no checks have run on that commit.
     pub main_check_status: Option<CheckStatus>,
+}
+
+/// An open pull request with its head-commit check status.
+#[derive(Debug, Clone)]
+pub struct PullRequest {
+    pub number: i32,
+    pub title: String,
+    pub url: String,
+    pub check_status: Option<CheckStatus>,
+}
+
+/// Detailed view of a repository: description and open PRs.
+#[derive(Debug, Clone)]
+pub struct RepoDetail {
+    pub description: Option<String>,
+    pub pull_requests: Vec<PullRequest>,
 }

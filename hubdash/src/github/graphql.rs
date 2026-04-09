@@ -11,72 +11,42 @@
 #[cynic::schema("github")]
 mod schema {}
 
+// ── Shared enums / input types ────────────────────────────────────────────────
+
 /// Repository affiliation filter for the `viewer.repositories` query.
 #[derive(cynic::Enum, Clone, Debug)]
 pub(crate) enum RepositoryAffiliation {
-    /// Repositories owned directly by the viewer.
     Owner,
-    /// Repositories the viewer collaborates on directly.
     Collaborator,
-    /// Repositories in organisations the viewer is a member of.
     OrganizationMember,
 }
 
-/// Which field to sort repositories by.
 #[derive(cynic::Enum, Clone, Debug)]
 pub(crate) enum RepositoryOrderField {
-    /// Sort by the most recent push date.
     PushedAt,
-    /// Sort by the most recent update date.
     UpdatedAt,
-    /// Sort by creation date.
     CreatedAt,
-    /// Sort alphabetically by name.
     Name,
-    /// Sort by star count.
     Stargazers,
 }
 
-/// Sort direction for repository listings.
 #[derive(cynic::Enum, Clone, Debug)]
 pub(crate) enum OrderDirection {
-    /// Ascending order.
     Asc,
-    /// Descending order.
     Desc,
 }
 
-/// Ordering argument for `viewer.repositories`.
 #[derive(cynic::InputObject, Clone, Debug)]
 pub(crate) struct RepositoryOrder {
-    /// The field to order by.
     pub(crate) field: RepositoryOrderField,
-    /// The direction to order in.
     pub(crate) direction: OrderDirection,
 }
 
-/// Variables for [`ListUserReposQuery`].
-#[derive(cynic::QueryVariables, Debug)]
-pub(crate) struct ListUserReposVariables {
-    /// Maximum number of repositories to return (up to 100).
-    pub(crate) first: i32,
-    /// Affiliation filters — controls which repos are included.
-    pub(crate) owner_affiliations: Vec<RepositoryAffiliation>,
-    /// How to order the returned repositories.
-    pub(crate) order_by: RepositoryOrder,
-}
-
-/// The `login` field on a repository owner.
-#[derive(cynic::QueryFragment, Debug)]
-pub(crate) struct RepositoryOwner {
-    /// The owner's GitHub login.
-    pub(crate) login: String,
-}
+// ── Shared fragments (reused by both queries) ─────────────────────────────────
 
 /// The combined check-and-status-context rollup for a commit.
 #[derive(cynic::QueryFragment, Debug)]
 pub(crate) struct StatusCheckRollup {
-    /// Aggregate state across all check suites and status contexts.
     pub(crate) state: StatusState,
 }
 
@@ -94,14 +64,10 @@ pub(crate) enum StatusState {
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Commit")]
 pub(crate) struct CommitNode {
-    /// Combined check status for this commit's default branch HEAD.
     pub(crate) status_check_rollup: Option<StatusCheckRollup>,
 }
 
 /// Inline-fragment selector over the `GitObject` interface.
-///
-/// We only care about `Commit` nodes; all other implementors (Tree, Blob, Tag)
-/// fall through to `Other`.
 #[derive(cynic::InlineFragments, Debug)]
 pub(crate) enum GitObject {
     Commit(CommitNode),
@@ -109,50 +75,112 @@ pub(crate) enum GitObject {
     Other,
 }
 
-/// The `Ref` type — wraps the target `GitObject` of a branch ref.
+/// Wraps the target `GitObject` of any branch / head ref.
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Ref")]
 pub(crate) struct BranchRef {
-    /// The Git object this ref points to (typically a `Commit`).
     pub(crate) target: Option<GitObject>,
 }
 
-/// A single repository node returned by the viewer query.
+// ── viewer.repositories query ─────────────────────────────────────────────────
+
+#[derive(cynic::QueryVariables, Debug)]
+pub(crate) struct ListUserReposVariables {
+    pub(crate) first: i32,
+    pub(crate) owner_affiliations: Vec<RepositoryAffiliation>,
+    pub(crate) order_by: RepositoryOrder,
+}
+
+#[derive(cynic::QueryFragment, Debug)]
+pub(crate) struct RepositoryOwner {
+    pub(crate) login: String,
+}
+
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Repository")]
 pub(crate) struct RepoNode {
-    /// Short repository name.
     pub(crate) name: String,
-    /// Owner login.
     pub(crate) owner: RepositoryOwner,
-    /// Optional description.
-    pub(crate) description: Option<String>,
-    /// Whether this repository is a fork.
     pub(crate) is_fork: bool,
-    /// The default branch ref — used to reach the HEAD commit's check rollup.
     pub(crate) default_branch_ref: Option<BranchRef>,
 }
 
-/// The `nodes` connection for a repository list.
 #[derive(cynic::QueryFragment, Debug)]
 pub(crate) struct RepositoryConnection {
-    /// Repositories in this page.
     pub(crate) nodes: Vec<RepoNode>,
 }
 
-/// The authenticated `viewer` with their repository list.
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "User", variables = "ListUserReposVariables")]
 pub(crate) struct Viewer {
-    /// Repositories accessible to the viewer.
     #[arguments(first: $first, ownerAffiliations: $owner_affiliations, orderBy: $order_by)]
     pub(crate) repositories: RepositoryConnection,
 }
 
-/// Root query — fetches the viewer's non-fork repositories that have CI checks.
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Query", variables = "ListUserReposVariables")]
 pub(crate) struct ListUserReposQuery {
-    /// The authenticated viewer.
     pub(crate) viewer: Viewer,
+}
+
+// ── repository(owner, name) detail query ─────────────────────────────────────
+
+#[derive(cynic::QueryVariables, Debug)]
+pub(crate) struct RepoDetailVariables {
+    pub(crate) owner: String,
+    pub(crate) name: String,
+    pub(crate) pr_first: i32,
+    pub(crate) pr_states: Option<Vec<PullRequestState>>,
+    pub(crate) pr_order_by: Option<IssueOrder>,
+}
+
+#[derive(cynic::Enum, Clone, Debug)]
+pub(crate) enum PullRequestState {
+    Open,
+    Closed,
+    Merged,
+}
+
+#[derive(cynic::Enum, Clone, Debug)]
+pub(crate) enum IssueOrderField {
+    CreatedAt,
+    UpdatedAt,
+    Comments,
+}
+
+#[derive(cynic::InputObject, Clone, Debug)]
+pub(crate) struct IssueOrder {
+    pub(crate) field: IssueOrderField,
+    pub(crate) direction: OrderDirection,
+}
+
+#[derive(cynic::QueryFragment, Debug)]
+#[cynic(graphql_type = "PullRequest")]
+pub(crate) struct PullRequestNode {
+    pub(crate) number: i32,
+    pub(crate) title: String,
+    pub(crate) url: String,
+    /// Head ref — used to reach the PR's HEAD commit check status.
+    pub(crate) head_ref: Option<BranchRef>,
+}
+
+#[derive(cynic::QueryFragment, Debug)]
+pub(crate) struct PullRequestConnection {
+    pub(crate) nodes: Vec<PullRequestNode>,
+}
+
+/// Repository fragment used in the detail query.
+#[derive(cynic::QueryFragment, Debug)]
+#[cynic(graphql_type = "Repository", variables = "RepoDetailVariables")]
+pub(crate) struct RepoDetailFragment {
+    pub(crate) description: Option<String>,
+    #[arguments(first: $pr_first, states: $pr_states, orderBy: $pr_order_by)]
+    pub(crate) pull_requests: PullRequestConnection,
+}
+
+#[derive(cynic::QueryFragment, Debug)]
+#[cynic(graphql_type = "Query", variables = "RepoDetailVariables")]
+pub(crate) struct RepoDetailQuery {
+    #[arguments(owner: $owner, name: $name)]
+    pub(crate) repository: Option<RepoDetailFragment>,
 }
