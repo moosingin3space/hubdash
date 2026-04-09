@@ -15,4 +15,4 @@ pub(crate) mod oauth;
 pub(crate) mod types;
 
 pub use oauth::GitHubOAuthConfig;
-pub use types::{Repository, WorkflowRun};
+pub use types::{CheckStatus, Repository};

@@ -19,8 +19,8 @@ fn repo_expand_returns_detail_html() {
             "expected repo-detail markup, got: {body}"
         );
         assert!(
-            body.contains("Pipelines"),
-            "expected Pipelines section, got: {body}"
+            body.contains("repo-github-link"),
+            "expected github link, got: {body}"
         );
         Ok(())
     });

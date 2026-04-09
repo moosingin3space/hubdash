@@ -66,14 +66,6 @@ fn build_router<P: Platform>(state: AppState<P>) -> Router {
     let dashboard_routes = Router::new()
         .route("/", get(dashboard::dashboard_page::<P>))
         .route("/repo/{owner}/{repo}/expand", get(dashboard::repo_expand))
-        .route(
-            "/repo/{owner}/{repo}/pipelines",
-            get(dashboard::repo_pipelines::<P>),
-        )
-        .route(
-            "/repo/{owner}/{repo}/summary",
-            get(dashboard::repo_summary::<P>),
-        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware::require_auth::<P>,

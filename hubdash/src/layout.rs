@@ -1,6 +1,6 @@
 //! Shared layout components for the Hubdash application.
 
-use maud::{DOCTYPE, Markup, PreEscaped, html};
+use maud::{DOCTYPE, Markup, html};
 
 /// Renders the base HTML layout with common head elements.
 pub fn base_layout(title: &str, styles: &[&str], scripts: &[&str], body: Markup) -> Markup {
@@ -24,14 +24,5 @@ pub fn base_layout(title: &str, styles: &[&str], scripts: &[&str], body: Markup)
                 (body)
             }
         }
-    }
-}
-
-/// Renders a checkmark or X icon based on a boolean value.
-pub fn check_icon(checked: bool) -> Markup {
-    if checked {
-        html! { span class="check-icon check-yes" { (PreEscaped("✓")) } }
-    } else {
-        html! { span class="check-icon check-no" { (PreEscaped("✗")) } }
     }
 }

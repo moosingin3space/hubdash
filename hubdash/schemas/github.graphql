@@ -53,8 +53,34 @@ type Repository {
   isPrivate: Boolean!
   url: String!
   isFork: Boolean!
+  defaultBranchRef: Ref
 }
 
 type RepositoryOwner {
   login: String!
+}
+
+type Ref {
+  target: GitObject
+}
+
+interface GitObject {
+  id: ID!
+}
+
+type Commit implements GitObject {
+  id: ID!
+  statusCheckRollup: StatusCheckRollup
+}
+
+type StatusCheckRollup {
+  state: StatusState!
+}
+
+enum StatusState {
+  ERROR
+  EXPECTED
+  FAILURE
+  PENDING
+  SUCCESS
 }

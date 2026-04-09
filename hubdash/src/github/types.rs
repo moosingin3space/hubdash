@@ -2,30 +2,15 @@
 
 use serde::Deserialize;
 
-/// Response wrapper for the workflow runs list endpoint.
-#[derive(Debug, Clone, Deserialize)]
-pub struct WorkflowRunsResponse {
-    /// The list of workflow runs.
-    pub workflow_runs: Vec<WorkflowRun>,
-}
-
-/// A single workflow run from the GitHub Actions API.
-#[derive(Debug, Clone, Deserialize)]
-pub struct WorkflowRun {
-    /// The name of the workflow.
-    pub name: Option<String>,
-    /// The event that triggered the run (e.g. "push", "pull_request", "schedule").
-    pub event: String,
-    /// The run status (e.g. "completed", "in_progress", "queued").
-    pub status: String,
-    /// The conclusion of a completed run (e.g. "success", "failure", "cancelled").
-    pub conclusion: Option<String>,
-    /// URL to the run on GitHub.
-    pub html_url: String,
-    /// When the run started, in ISO 8601 format.
-    pub run_started_at: Option<String>,
-    /// When the run was last updated, in ISO 8601 format.
-    pub updated_at: String,
+/// The aggregated CI check status for a repository's default branch HEAD.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckStatus {
+    /// All checks passed.
+    Success,
+    /// At least one check failed or errored.
+    Failure,
+    /// Checks are queued or in progress.
+    Pending,
 }
 
 /// Owner of a GitHub repository.
@@ -36,7 +21,7 @@ pub struct RepositoryOwner {
 }
 
 /// A GitHub repository.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Repository {
     /// The short name of the repository (e.g. "hubdash").
     pub name: String,
@@ -44,4 +29,7 @@ pub struct Repository {
     pub owner: RepositoryOwner,
     /// The repository description.
     pub description: Option<String>,
+    /// Aggregated check status of the HEAD commit on the default branch,
+    /// or `None` if no checks have run on that commit.
+    pub main_check_status: Option<CheckStatus>,
 }
