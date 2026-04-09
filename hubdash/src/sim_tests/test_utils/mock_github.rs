@@ -23,7 +23,8 @@
 //! ```
 
 use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, Enum, InputObject, Object, Schema, SimpleObject,
+    Context, EmptyMutation, EmptySubscription, Enum, InputObject, Interface, Object, Schema,
+    SimpleObject,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::extract::State;
@@ -76,77 +77,108 @@ type MockSchema = Schema<MockQuery, EmptyMutation, EmptySubscription>;
 /// Repository affiliation — matches the schema enum.
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 enum RepositoryAffiliation {
-    /// Repositories owned by the viewer.
     Owner,
-    /// Repositories the viewer collaborates on directly.
     Collaborator,
-    /// Repositories in organisations the viewer is a member of.
     OrganizationMember,
 }
 
 /// Repository sort field — matches the schema enum.
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 enum RepositoryOrderField {
-    /// Sort by most recent push.
     PushedAt,
-    /// Sort by most recent update.
     UpdatedAt,
-    /// Sort by creation date.
     CreatedAt,
-    /// Sort alphabetically by name.
     Name,
-    /// Sort by star count.
     Stargazers,
 }
 
 /// Sort direction — matches the schema enum.
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 enum OrderDirection {
-    /// Ascending.
     Asc,
-    /// Descending.
     Desc,
 }
 
 /// Ordering argument for `repositories`.
 #[derive(InputObject, Clone)]
 struct RepositoryOrder {
-    /// Field to order by.
     field: RepositoryOrderField,
-    /// Direction to order in.
     direction: OrderDirection,
+}
+
+/// Possible states for a commit's combined check rollup — mirrors `StatusState`.
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(name = "StatusState")]
+enum MockStatusState {
+    Error,
+    Expected,
+    Failure,
+    Pending,
+    Success,
+}
+
+/// Combined check status rollup — mirrors `StatusCheckRollup`.
+#[derive(SimpleObject, Clone)]
+#[graphql(name = "StatusCheckRollup")]
+struct MockStatusCheckRollup {
+    state: MockStatusState,
+}
+
+/// Mock `Commit` object — implements the `GitObject` interface.
+#[derive(Clone)]
+struct MockCommit {
+    has_checks: bool,
+}
+
+#[Object(name = "Commit")]
+impl MockCommit {
+    async fn id(&self) -> String {
+        "mock-commit-id".to_string()
+    }
+
+    async fn status_check_rollup(&self) -> Option<MockStatusCheckRollup> {
+        self.has_checks.then_some(MockStatusCheckRollup {
+            state: MockStatusState::Success,
+        })
+    }
+}
+
+/// `GitObject` interface — the only implementor we expose is `Commit`.
+#[derive(Interface, Clone)]
+#[graphql(field(name = "id", ty = "String"))]
+enum MockGitObject {
+    MockCommit(MockCommit),
+}
+
+/// `Ref` type — wraps the target `GitObject` of a branch ref.
+#[derive(SimpleObject, Clone)]
+#[graphql(name = "Ref")]
+struct MockRef {
+    target: Option<MockGitObject>,
 }
 
 /// Repository owner (user or organisation).
 #[derive(SimpleObject, Clone)]
 struct MockOwner {
-    /// GitHub login.
     login: String,
 }
 
 /// A repository node returned by the mock viewer query.
 #[derive(SimpleObject, Clone)]
 struct MockRepo {
-    /// Stable integer database ID.
     database_id: Option<i32>,
-    /// Short repository name.
     name: String,
-    /// Owner login.
     owner: MockOwner,
-    /// Optional description.
     description: Option<String>,
-    /// Whether this repository is private.
     is_private: bool,
-    /// HTML URL.
     url: String,
-    /// Whether this repository is a fork.
     is_fork: bool,
+    default_branch_ref: Option<MockRef>,
 }
 
 /// `nodes` list for the repository connection.
 #[derive(SimpleObject)]
 struct MockRepositoryConnection {
-    /// Repositories in this page.
     nodes: Vec<MockRepo>,
 }
 
@@ -174,7 +206,6 @@ struct MockQuery;
 
 #[Object]
 impl MockQuery {
-    /// Returns the mock authenticated viewer.
     async fn viewer(&self, _ctx: &Context<'_>) -> MockViewer {
         MockViewer
     }
@@ -183,9 +214,10 @@ impl MockQuery {
 /// Hardcoded repositories returned by the mock GraphQL endpoint.
 ///
 /// Includes one fork (`forked-lib`) to verify that the application filters
-/// forks out before rendering them in the dashboard.
+/// forks out.  Repos with `has_checks: false` are excluded because their
+/// `statusCheckRollup` returns `None`.
 fn mock_repos() -> Vec<MockRepo> {
-    fn repo(id: i32, name: &str, is_fork: bool) -> MockRepo {
+    fn repo(id: i32, name: &str, is_fork: bool, has_checks: bool) -> MockRepo {
         MockRepo {
             database_id: Some(id),
             name: name.to_string(),
@@ -196,14 +228,17 @@ fn mock_repos() -> Vec<MockRepo> {
             is_private: false,
             url: format!("https://github.com/{MOCK_USER_LOGIN}/{name}"),
             is_fork,
+            default_branch_ref: Some(MockRef {
+                target: Some(MockGitObject::MockCommit(MockCommit { has_checks })),
+            }),
         }
     }
 
     vec![
-        repo(1, "hubdash", false),
-        repo(2, "api-gateway", false),
-        repo(3, "frontend-app", false),
-        repo(4, "forked-lib", true),
+        repo(1, "hubdash", false, true),
+        repo(2, "api-gateway", false, true),
+        repo(3, "frontend-app", false, true),
+        repo(4, "forked-lib", true, false),
     ]
 }
 

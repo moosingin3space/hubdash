@@ -18,10 +18,10 @@ use crate::session::GitHubUser;
 use cynic::QueryBuilder;
 
 use super::graphql::{
-    ListUserReposQuery, ListUserReposVariables, OrderDirection, RepositoryAffiliation,
-    RepositoryOrder, RepositoryOrderField,
+    GitObject, ListUserReposQuery, ListUserReposVariables, OrderDirection, RepositoryAffiliation,
+    RepositoryOrder, RepositoryOrderField, StatusState,
 };
-use super::types::{Repository, RepositoryOwner, WorkflowRunsResponse};
+use super::types::{CheckStatus, Repository, RepositoryOwner};
 
 /// Configuration for the GitHub OAuth flow.
 #[derive(Debug, Clone)]
@@ -192,11 +192,19 @@ where
     serde_json::from_slice(&body_bytes).map_err(OAuthError::JsonParse)
 }
 
-/// Lists non-fork repositories accessible to the authenticated user via GraphQL.
+fn status_state_to_check_status(state: StatusState) -> CheckStatus {
+    match state {
+        StatusState::Success => CheckStatus::Success,
+        StatusState::Failure | StatusState::Error => CheckStatus::Failure,
+        StatusState::Pending | StatusState::Expected => CheckStatus::Pending,
+    }
+}
+
+/// Lists repositories accessible to the authenticated user via GraphQL.
 ///
-/// Sends a compile-time–validated cynic query to `POST /graphql`, fetches up
-/// to 100 repositories ordered by most-recently-pushed, and filters out forks
-/// before returning.
+/// Only returns non-fork repositories whose default branch HEAD commit has a
+/// `statusCheckRollup` — i.e. repositories that actually have CI checks
+/// configured.  The rollup state is included in each returned [`Repository`].
 pub async fn list_user_repos<C>(
     http_client: &C,
     api_base_url: &Url,
@@ -271,55 +279,27 @@ where
         .nodes
         .into_iter()
         .filter(|node| !node.is_fork)
-        .map(|node| Repository {
-            name: node.name,
-            owner: RepositoryOwner {
-                login: node.owner.login,
-            },
-            description: node.description,
+        .filter_map(|node| {
+            // Extract the statusCheckRollup from defaultBranchRef → Commit.
+            // Repos with no rollup (no checks on HEAD) are excluded.
+            let main_check_status = node
+                .default_branch_ref
+                .as_ref()
+                .and_then(|r| r.target.as_ref())
+                .and_then(|t| match t {
+                    GitObject::Commit(c) => c.status_check_rollup.as_ref(),
+                    GitObject::Other => None,
+                })
+                .map(|rollup| status_state_to_check_status(rollup.state));
+
+            main_check_status.map(|status| Repository {
+                name: node.name,
+                owner: RepositoryOwner {
+                    login: node.owner.login,
+                },
+                description: node.description,
+                main_check_status: Some(status),
+            })
         })
         .collect())
-}
-
-/// Lists recent workflow runs for a repository.
-///
-/// Returns up to `per_page` workflow runs, most recent first.
-pub async fn list_workflow_runs<C>(
-    http_client: &C,
-    access_token: &str,
-    owner: &str,
-    repo: &str,
-    per_page: u32,
-) -> Result<WorkflowRunsResponse, OAuthError<C::Error>>
-where
-    C: HttpClient,
-{
-    let request = Request::builder()
-        .method(Method::GET)
-        .uri(format!(
-            "https://api.github.com/repos/{owner}/{repo}/actions/runs?per_page={per_page}"
-        ))
-        .header(ACCEPT, "application/vnd.github+json")
-        .header(AUTHORIZATION, format!("Bearer {access_token}"))
-        .header(USER_AGENT, "hubdash")
-        .body(Full::new(bytes::Bytes::new()))?;
-
-    let response = http_client.fetch(request).await.map_err(OAuthError::Http)?;
-    let status = response.status();
-    let body_bytes = response
-        .into_body()
-        .collect()
-        .await
-        .unwrap_or_default()
-        .to_bytes();
-
-    if !status.is_success() {
-        let body_str = String::from_utf8_lossy(&body_bytes).into_owned();
-        return Err(OAuthError::ApiError {
-            status,
-            body: body_str,
-        });
-    }
-
-    serde_json::from_slice(&body_bytes).map_err(OAuthError::JsonParse)
 }

@@ -73,6 +73,50 @@ pub(crate) struct RepositoryOwner {
     pub(crate) login: String,
 }
 
+/// The combined check-and-status-context rollup for a commit.
+#[derive(cynic::QueryFragment, Debug)]
+pub(crate) struct StatusCheckRollup {
+    /// Aggregate state across all check suites and status contexts.
+    pub(crate) state: StatusState,
+}
+
+/// Possible states for a commit's combined check rollup.
+#[derive(cynic::Enum, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StatusState {
+    Error,
+    Expected,
+    Failure,
+    Pending,
+    Success,
+}
+
+/// The `Commit` concrete type, selected via an inline fragment on `GitObject`.
+#[derive(cynic::QueryFragment, Debug)]
+#[cynic(graphql_type = "Commit")]
+pub(crate) struct CommitNode {
+    /// Combined check status for this commit's default branch HEAD.
+    pub(crate) status_check_rollup: Option<StatusCheckRollup>,
+}
+
+/// Inline-fragment selector over the `GitObject` interface.
+///
+/// We only care about `Commit` nodes; all other implementors (Tree, Blob, Tag)
+/// fall through to `Other`.
+#[derive(cynic::InlineFragments, Debug)]
+pub(crate) enum GitObject {
+    Commit(CommitNode),
+    #[cynic(fallback)]
+    Other,
+}
+
+/// The `Ref` type — wraps the target `GitObject` of a branch ref.
+#[derive(cynic::QueryFragment, Debug)]
+#[cynic(graphql_type = "Ref")]
+pub(crate) struct BranchRef {
+    /// The Git object this ref points to (typically a `Commit`).
+    pub(crate) target: Option<GitObject>,
+}
+
 /// A single repository node returned by the viewer query.
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Repository")]
@@ -85,6 +129,8 @@ pub(crate) struct RepoNode {
     pub(crate) description: Option<String>,
     /// Whether this repository is a fork.
     pub(crate) is_fork: bool,
+    /// The default branch ref — used to reach the HEAD commit's check rollup.
+    pub(crate) default_branch_ref: Option<BranchRef>,
 }
 
 /// The `nodes` connection for a repository list.
@@ -103,7 +149,7 @@ pub(crate) struct Viewer {
     pub(crate) repositories: RepositoryConnection,
 }
 
-/// Root query — fetches the viewer's non-fork repositories.
+/// Root query — fetches the viewer's non-fork repositories that have CI checks.
 #[derive(cynic::QueryFragment, Debug)]
 #[cynic(graphql_type = "Query", variables = "ListUserReposVariables")]
 pub(crate) struct ListUserReposQuery {
