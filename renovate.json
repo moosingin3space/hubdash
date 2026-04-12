@@ -8,5 +8,21 @@
         "github>moosingin3space/renovate-util:miniflareAutomerge",
         "github>moosingin3space/renovate-util:wranglerAutomerge",
         "github>moosingin3space/renovate-util:dagger"
+    ],
+    "packageRules": [
+      {
+        "matchDepNames": [
+          "worker",
+          "cargo:worker-build"
+        ],
+        "groupName": "Cloudflare Workers Rust SDK"
+      },
+      {
+        "matchDepNames": [
+          "cynic",
+          "cynic-codegen"
+        ],
+        "groupName": "cynic"
+      }
     ]
 }
