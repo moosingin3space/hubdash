@@ -1,5 +1,5 @@
 [tools]
 "cargo:wasm-bindgen-cli" = "0.2.114"
-"cargo:worker-build" = "0.7.5"
+"cargo:worker-build" = "0.8.0"
 "cargo:bacon" = "3.22.0"
 "cargo:systemfd" = "0.4.6"
