@@ -1,6 +1,6 @@
 {
   "name": "hubdash",
-  "engineVersion": "v0.20.3",
+  "engineVersion": "v0.21.9",
   "sdk": {
     "source": "go"
   },
@@ -17,8 +17,8 @@
     },
     {
       "name": "wolfi",
-      "source": "github.com/dagger/dagger/modules/wolfi@v0.20.3",
-      "pin": "478a15799474f15a772960563235ed5106c1db65"
+      "source": "github.com/dagger/dagger/modules/wolfi@v0.21.9",
+      "pin": "f2aefc20cf41b5ed7922df7244e0f10ddc6031f7"
     }
   ],
   "source": ".dagger"
